@@ -1,7 +1,7 @@
 # Valeria Gaona - 202214418
 # Andrea Beleño - 200620739
 
-#### PROBLEM SET 1 #####
+#### PROBLEM SET 2 #####
 
 #Con este script se realizará el scraping de las bases de datos que serán usada 
 #para el desarrollo del Problem Set, específicamente puntos 1 y 2.
@@ -10,6 +10,9 @@ install.packages("pacman") #Instalar librería si no cuenta con esta
 library(pacman) #Llamar librería
 p_load(rio, #Instalar librerías que falten
        tidyverse,
+       dplyr,
+       readr,
+       gamlr,
        e1071,
        EnvStats,
        tidymodels,
@@ -31,6 +34,15 @@ p_load(rio, #Instalar librerías que falten
        recipes)
 
 rm(list = ls()) #Limpia las variables que existan al momento de correr el código
+
+
+###Base de datos Problem set 2
+
+library(readr)
+
+Datos_training<-read.csv(unzip("../Elementos_Guardados/train_personas.zip","train_personas.csv"))#Se extrae del .zip, teniendo en cuenta que es un archivo muy grande para subir a Github
+
+
 
 #####BASE DE DATOS GEIH Punto 1.1.1
 
