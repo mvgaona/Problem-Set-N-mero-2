@@ -10,6 +10,7 @@ install.packages("pacman") #Instalar librería si no cuenta con esta
 library(pacman) #Llamar librería
 p_load(rio, #Instalar librerías que falten
        tidyverse,
+       glmnet,
        dplyr,
        readr,
        gamlr,
