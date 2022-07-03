@@ -48,12 +48,14 @@ library(readr)
 #Datos_training_personas<-read.csv(unzip("../Elementos_Guardados/train_personas.zip","train_personas.csv"))#Se extrae del .zip, teniendo en cuenta que es un archivo muy grande para subir a Github
 #file.remove('train_personas.csv')#"Por si se requiere borrar algún archivo
 
-
-Datos_test_hogares<-readRDS("../Elementos_Guardados/test_hogares.rds") #Guardar las bases de datos
+#Se debe poner el directorio de donde está el script:
+#Session-> Set Working directory -> To source file location, para lo cual se debe descargar el repositorioDatos_test_hogares<-readRDS("../Elementos_Guardados/test_hogares.rds") #Guardar las bases de datos
 Datos_test_personas<-readRDS("../Elementos_Guardados/test_personas.rds") #Guardar las bases de datos
-
+Datos_test_hogares <- readRDS("../Elementos_Guardados/test_hogares.rds")
 Datos_training_hogares<-readRDS("../Elementos_Guardados/train_hogares.rds") #Guardar las bases de datos
 Datos_training_personas<-readRDS("../Elementos_Guardados/train_personas.rds")
+
+
 
 
 
