@@ -42,6 +42,7 @@ library(readr)
 
 Datos_training<-read.csv(unzip("../Elementos_Guardados/train_personas.zip","train_personas.csv"))#Se extrae del .zip, teniendo en cuenta que es un archivo muy grande para subir a Github
 
+#file.remove("../Elementos_Guardados/train_personas.csv")#"Por si se requiere borrar algún archivo
 
 
 #####BASE DE DATOS GEIH Punto 1.1.1
