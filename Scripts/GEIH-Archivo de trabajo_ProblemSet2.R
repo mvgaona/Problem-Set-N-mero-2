@@ -32,18 +32,13 @@ p_load(rio, #Instalar librerías que falten
        ISLR2,
        stargazer,
        modeest,
-       recipes)
-
+       recipes,
+       glmnet)
 rm(list = ls()) #Limpia las variables que existan al momento de correr el código
-
-
 ###Base de datos Problem set 2
-
 library(readr)
-
 #Datos_test_hogares<-read.csv("../Elementos_Guardados/test_hogares.csv") #Guardar las bases de datos
 #Datos_test_personas<-read.csv("../Elementos_Guardados/test_personas.csv") #Guardar las bases de datos
-
 #Datos_training_hogares<-read.csv("../Elementos_Guardados/train_hogares.csv") #Guardar las bases de datos
 #Datos_training_personas<-read.csv(unzip("../Elementos_Guardados/train_personas.zip","train_personas.csv"))#Se extrae del .zip, teniendo en cuenta que es un archivo muy grande para subir a Github
 #file.remove('train_personas.csv')#"Por si se requiere borrar algún archivo
@@ -54,7 +49,7 @@ setwd("C:/Users/valer/Desktop/Andes/Intersemestral/Big Data/Problem Set 2/Proble
 DTEST_P<-data.frame(readRDS("../Elementos_Guardados/test_personas.rds"))  #Guardar las bases de datos
 DTEST_H <- data.frame(readRDS("../Elementos_Guardados/test_hogares.rds"))
 DTRAIN_H<-data.frame(readRDS("../Elementos_Guardados/train_hogares.rds")) #Guardar las bases de datos
-DREAIN_P<-data.frame(readRDS("../Elementos_Guardados/train_personas.rds"))
+DTEAIN_P<-data.frame(readRDS("../Elementos_Guardados/train_personas.rds"))
 summary(DTRAIN_H$Lp)
 summary(DTEST_H$Lp)
 plot(hist(DTRAIN_H$Lp),main="Distribución Línea Pobreza, train Hogares",
@@ -139,15 +134,39 @@ DaTEST_H<- cbind(DaTEST_H, OcVivTl)
 ###Clasificación
 table(DaTRAIN_H$Pobre)
 #Modelo1
-model_log_1 <- glm(Pobre ~ factor(OcVivl),family="binomial", data= DaTRAIN_H)
+model1 <- as.formula("Pobre ~ OcVivl")
+model_log_1 <- glm(model1,family=binomial(link="logit"), data= DaTRAIN_H)
 summary(model_log_1)
 tidy(model_log_1)
 ###Prediccion
-PredMod_Log_1 = predict(model_log_1 , newdata= DaTRAIN_H, type="response")
+DaTRAIN_H$PredMod_Log_1 <- predict(model_log_1 , newdata= DaTRAIN_H, type="response")
 summary(PredMod_Log_1)
 tidy(PredMod_Log_1) 
+rule=0.5
+DaTRAIN_H$PredMod_Log_1 <- ifelse(DaTRAIN_H$PredMod_Log_1>rule,1,0)
+DaTRAIN_H$PredMod_Log_1
+#Clasificación Modelo 1
+cm_log1 = confusionMatrix(data= factor(DaTRAIN_H$PredMod_Log_1) , 
+                         reference= factor(DaTRAIN_H$Pobre) , 
+                         mode="sens_spec" , positive="1")
+cm_log1
 
-
-
+#Modelo2
+model2 <- as.formula("Pobre ~ Lp")
+Mod_log_2 <- glm(model2,family=binomial(link = "logit"), data= DaTRAIN_H)
+tidy(Mod_log_2)
+#Predicción
+###Prediccion
+DaTRAIN_H$PredMod_Log_2 <- predict(Mod_log_2 , newdata= DaTRAIN_H, type="response")
+summary(DaTRAIN_H$PredMod_Log_2)
+tidy(DaTRAIN_H$PredMod_Log_1) 
+rule=0.5
+DaTRAIN_H$PredMod_Log_2 <- ifelse(DaTRAIN_H$PredMod_Log_2>rule,1,0)
+DaTRAIN_H$PredMod_Log_2
+#Clasificación Modelo 2
+cm_log2 = confusionMatrix(data= factor(DaTRAIN_H$PredMod_Log_2) , 
+                          reference= factor(DaTRAIN_H$Pobre) , 
+                          mode="sens_spec" , positive="1")
+cm_log2
 
 
