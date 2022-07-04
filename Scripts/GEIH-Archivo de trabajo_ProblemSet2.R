@@ -55,10 +55,12 @@ Datos_test_hogares <- readRDS("../Elementos_Guardados/test_hogares.rds")
 Datos_training_hogares<-readRDS("../Elementos_Guardados/train_hogares.rds") #Guardar las bases de datos
 Datos_training_personas<-readRDS("../Elementos_Guardados/train_personas.rds")
 
+skim(Datos_test_personas)
+skim(Datos_test_hogares)
 
+Datos_training_junto<-merge(x=Datos_training_personas, y=Datos_training_hogares, by= c("id"))
 
-
-
+Mini_matrix_test_personas<-subset(Datos_test_personas, select = c( "id","P6040", "Oc", "Des") )
 
 
 #####BASE DE DATOS GEIH Punto 1.1.1
