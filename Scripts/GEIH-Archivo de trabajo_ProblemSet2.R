@@ -11,32 +11,27 @@ install.packages("caret")
 install.packages("Matrix")
 install.packages("recipes")
 library(pacman) #Llamar librería
+#Se sacaran de p_load las siguientes librerias: e1071 ,EnvStats,knitr,kableExtra,foreign,ISLR2,
 p_load(rio, #Instalar librerías que falten
        tidyverse,
        glmnet,
        dplyr,
        readr,
        gamlr,
-       e1071,
-       EnvStats,
        tidymodels,
        ggplot2,
        scales,
        ggpubr,
-       knitr,
-       kableExtra,
-       foreign,
        skimr,
        rvest,
        caret,
        stringr,
        boot,
        caret,
-       ISLR2,
-       stargazer,
        modeest,
        recipes,
-       glmnet)
+       glmnet,
+       stargazer)
 rm(list = ls()) #Limpia las variables que existan al momento de correr el código
 ###Base de datos Problem set 2
 library(readr)
@@ -109,11 +104,14 @@ modeLp <- function(Lp){
   return(as.numeric(names(which.max(table(Lp)))))
 }
 modeLp(Lp)
+summary(Lp)
 #Descripción Dominio
 DOM <- factor(DaTRAIN_H$Dominio)
 class(DOM)
 summary(DOM)
 plot(DOM)
+library(dplyr)
+plot(DaTRAIN_H, col = c("red", "blue"), main = "DOM vs id")
 #Mirar como sacar el porcentaje de cada ciudad/ Rural 
 #Descripción P5090 = Ocupación de la vivienda habitada
 library(tidyverse)
