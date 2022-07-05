@@ -110,8 +110,7 @@ DOM <- factor(DaTRAIN_H$Dominio)
 class(DOM)
 summary(DOM)
 plot(DOM)
-library(dplyr)
-plot(DaTRAIN_H, col = c("red", "blue"), main = "DOM vs Pobre")
+
 #Mirar como sacar el porcentaje de cada ciudad/ Rural 
 #Descripción P5090 = Ocupación de la vivienda habitada
 library(tidyverse)
@@ -153,12 +152,59 @@ table(DaTRAIN_H$Pobre)
 #Ridge y Lasso.
 set.seed(10101)
 modeloR <- lm(Pobre ~ Npersug + Lp + factor(Dominio) + P5000 + factor(OcVivl), data = DaTRAIN_H)
-xmodlas<- model.matrix(~Npersug+Lp + factor(Dominio)+P5000+factor(OcVivl), DaTRAIN_H)
-ymodlas <- DaTRAIN_H$Pobre
-lasso.mod1 <- glmnet(xmodlas, ymodlas, alpha = 1 , lambda = 0.03)
-lasso.mod1$beta
-tidy(modeloR)
 modeloR
+xmodRi<- model.matrix(~Npersug+Lp + factor(Dominio)+P5000+factor(OcVivl), DaTRAIN_H)
+ymodRi <- DaTRAIN_H$Pobre
+Ri.mod1 <- glmnet(xmodRi, ymodRi, alpha = 1 , lambda = 0.03)
+modeloRi <- glmnet(
+  x           = xmodRi,
+  y           = ymodRi,
+  alpha       = 0,
+  nlambda     = 100,
+  standardize = TRUE
+)
+regmodRi <- modeloRi$beta %>% 
+  as.matrix() %>%
+  t() %>% 
+  as_tibble() %>%
+  mutate(lambda = modeloRi$lambda)
+regmodRi <- regmodRi %>%
+  pivot_longer(
+    cols = !lambda, 
+    names_to = "predictor",
+    values_to = "coeficientes"
+  )
+
+regmodRi %>%
+  ggplot(aes(x = lambda, y = coeficientes, color = predictor)) +
+  geom_line() +
+  scale_x_log10(
+    breaks = trans_breaks("log10", function(x) 10^x),
+    labels = trans_format("log10", math_format(10^.x))
+  ) +
+  labs(title = "Coeficientes del modelo en función de la regularización") +
+  theme_bw() +
+  theme(legend.position = "none")
+
+set.seed(10101)
+cv_errormodRi <- cv.glmnet(
+  x           = xmodRi,
+  y           = ymodRi,
+  alpha  = 0,
+  nfolds = 10,
+  type.measure = "mse",
+  standardize  = TRUE
+)
+
+plot(cv_errormodRi)
+paste("Mejor valor de lambda encontrado:", cv_errormodRi$lambda.min)
+# Mayor valor de lambda con el que el test-error no se aleja más de 1sd del mínimo.
+paste("Mejor valor de lambda encontrado + 1 desviación estándar:", cv_errormodRi$lambda.1se)
+
+#lasso.mod1
+#lasso.mod1$beta
+#tidy(modeloR)
+#modeloR
 library(stargazer)
 stargazer(modeloR,type = "text")
 mr_coeficientes <- modeloR$coefficients %>%
