@@ -111,7 +111,7 @@ class(DOM)
 summary(DOM)
 plot(DOM)
 library(dplyr)
-plot(DaTRAIN_H, col = c("red", "blue"), main = "DOM vs id")
+plot(DaTRAIN_H, col = c("red", "blue"), main = "DOM vs Pobre")
 #Mirar como sacar el porcentaje de cada ciudad/ Rural 
 #Descripción P5090 = Ocupación de la vivienda habitada
 library(tidyverse)
@@ -133,7 +133,20 @@ OcVivTl <- factor(OcVivT, labels = c("Propia_Pagada", "Propia_Pagando", "Arriend
 summary(OcVivTl)
 
 DaTEST_H<- cbind(DaTEST_H, OcVivTl)
-#Falta porcentaje
+#Descripción de P5000
+P5000<- DaTRAIN_H$P5000
+class(P5000)
+plot(hist(P5000),col = "black", main="Histograma No. de cuartos de la vivienda",
+     xlab="P5000",
+     ylab="Frecuencia")
+min(P5000)
+max(P5000)
+mean(P5000)
+modeLp <- function(P5000){
+  return(as.numeric(names(which.max(table(P5000)))))
+}
+modeLp(P5000)
+summary(P5000)
 #Llamamos las librerias
 ###Clasificación
 table(DaTRAIN_H$Pobre)
