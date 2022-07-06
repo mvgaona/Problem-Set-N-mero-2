@@ -151,8 +151,7 @@ summary(P5000)
 table(DaTRAIN_H$Pobre)
 #Ridge y Lasso.
 set.seed(10101)
-modeloR <- lm(Pobre ~ Npersug + Lp + factor(Dominio) + P5000 + factor(OcVivl), data = DaTRAIN_H)
-modeloR
+
 xmodRi<- model.matrix(~Npersug+Lp + factor(Dominio)+P5000+factor(OcVivl), DaTRAIN_H)
 ymodRi <- DaTRAIN_H$Pobre
 Ri.mod1 <- glmnet(xmodRi, ymodRi, alpha = 1 , lambda = 0.03)
@@ -200,13 +199,15 @@ plot(cv_errormodRi)
 paste("Mejor valor de lambda encontrado:", cv_errormodRi$lambda.min)
 # Mayor valor de lambda con el que el test-error no se aleja más de 1sd del mínimo.
 paste("Mejor valor de lambda encontrado + 1 desviación estándar:", cv_errormodRi$lambda.1se)
+ ##
+
 
 #lasso.mod1
 #lasso.mod1$beta
 #tidy(modeloR)
 #modeloR
 library(stargazer)
-stargazer(modeloR,type = "text")
+stargazer(regmodRi,type = "text")
 mr_coeficientes <- modeloR$coefficients %>%
   enframe(name = "predictor", value = "coeficiente")
 
