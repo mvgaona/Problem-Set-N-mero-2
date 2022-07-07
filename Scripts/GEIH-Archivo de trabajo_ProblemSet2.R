@@ -838,9 +838,213 @@ cm_log2
 cm_log1
 
 #Modelo3
-model3 <- as.formula("Pobre ~ Lp + OcVivl + Npersug")
+model3 <- as.formula("Pobre ~ Lp + OcVivl*Npersug")
+require(caret)
+set.seed(10101)
+Split_1Mod3<- createDataPartition(DaTRAIN_H$Pobre, p = .7) [[1]]
+length(Split_1Mod3)
+other_Mod3 <- DaTRAIN_H[-Split_1Mod3,]
+DaTRAIN_H_mini_Mod3<- DaTRAIN_H[ Split_1Mod3,] #Base mini train
+
+set.seed(10101)
+Split_2Mod3<- createDataPartition(other_Mod3$Pobre, p = 1/3) [[1]]
+Evaluation_H_Mod3 <- other_Mod3[ Split_2Mod3,] #Base evaluacion para ROC
+Testing_H_Mod3 <- other_Mod1[-Split_2Mod3,] #Base mini test
+
+#Se realiza el K-fold como método de control del modelo
+Varios_parametrosMod3<-function(...)c(twoClassSummary(...), defaultSummary(...))
+
+ctrl_def_Mod3 <- trainControl(method = "cv",
+                              number = 5,
+                              summaryFunction = Varios_parametrosMod3,
+                              classProbs = TRUE,
+                              verbose=FALSE,
+                              savePredictions = T)
+#logit
+set.seed(10101)
+#Se realiza el modelo de clasificacón con la base de control 
+logit_caret_Mod3 <- train(
+  Pobre_dummy ~Lp + OcVivl*Npersug,
+  data =DaTRAIN_H_mini_Mod3 ,
+  method = "glm", #Para logit
+  trControl = ctrl_def_Mod3,
+  family = "binomial",
+  preProcess = c("center", "scale"))
+logit_caret_Mod3
+
+#Lambdas para Lasso
+lambdasMod3<- 10^seq(-4, 0.01, length = 200)
+
+#Ahora, se hará la prueba tomando como métrica la Sensibilidad
+set.seed(10101)
+logit_lasso_SensMod3 <- train(
+  Pobre_dummy ~Lp + OcVivl*Npersug,
+  data = DaTRAIN_H_mini_Mod3,
+  method = "glmnet",
+  trControl = ctrl_def_Mod3,
+  family = "binomial",
+  metric = "Sens",
+  tuneGrid = expand.grid(alpha = 0,lambda=lambdasMod3),
+  preProcess = c("center", "scale"))
+
+logit_lasso_SensMod3
+
+#Ahora, se hará la prueba tomando como métrica el ROC
+
+set.seed(10101)
+logit_lasso_rocMod3 <- train(
+  Pobre_dummy ~Lp + OcVivl*Npersug,
+  data = DaTRAIN_H_mini_Mod3,
+  method = "glmnet",
+  trControl = ctrl_def_Mod3,
+  family = "binomial",
+  metric = "ROC",
+  tuneGrid = expand.grid(alpha = 0,lambda=lambdasMod3),
+  preProcess = c("center", "scale"))
+
+logit_lasso_rocMod3
+
+#Calcularemos la regla para realizar la clasificación (Cut off)
+
+Eval_ResultadosMod3 <- data.frame(Pobre = Evaluation_H_Mod3$Pobre_dummy)
+Eval_ResultadosMod3$Roc <- predict(logit_lasso_rocMod3,
+                                   newdata = Evaluation_H_Mod3,
+                                   type = "prob")[,1]
+
+install.packages("pROC")
+library(pROC)
+#Se calcula el ROC para la regresión
+rf_ROCMod3 <- roc(Eval_ResultadosMod3$Pobre, Eval_ResultadosMod3$Roc, levels = rev(levels(Eval_ResultadosMod3$Pobre)))
+
+rf_ROCMod3
+
+#Se calcula el Cut off
+rf_ThreshMod3 <- coords(rf_ROCMod3, x = "best", best.method = "closest.topleft")
+rf_ThreshMod3
+
+#Se evalúan los resultados
+Eval_ResultadosMod3<-Eval_ResultadosMod3 %>% mutate(hat_def_05Mod3=ifelse(Eval_ResultadosMod3$Roc>0.5,"Si","No"),
+                                                    hat_def_rf_ThreshMod3=ifelse(Eval_ResultadosMod3$Roc>rf_ThreshMod3$threshold,"Si","No"))
+
+
+#Cuando el threshold es igual a 0.5 (regla de Bayes)
+with(Eval_ResultadosMod3,table(Pobre,hat_def_05Mod3))
+#Cuando el threshold es obtenido del ROC
+with(Eval_ResultadosMod3,table(Pobre,hat_def_rf_ThreshMod3))
+
+#Up-sampling
+set.seed(10101)
+upSampled_Train_HMod3<- upSample(x = DaTRAIN_H_mini_Mod3,
+                                 y = DaTRAIN_H_mini_Mod3$Pobre_dummy,
+                                 ## Mantener la variable de clasificación con el mismo nombre:
+                                 yname = "Pobre_dummy")
+
+dim(upSampled_Train_HMod3)
+table(upSampled_Train_HMod3$Pobre_dummy)
+
+set.seed(10101)
+logit_lasso_upsampleMod <- train(
+  Pobre_dummy ~ Lp + OcVivl*Npersug,
+  data = upSampled_Train_HMod3,
+  method = "glmnet",
+  trControl = ctrl_def_Mod3,
+  family = "binomial",
+  metric = "ROC",
+  tuneGrid = expand.grid(alpha = 0,lambda=lambdasMod3),
+  preProcess = c("center", "scale")
+)
+logit_lasso_upsampleMod3
+
+#Down-sampling
+set.seed(10101)
+downSampled_Train_HMod3 <- downSample(x = DaTRAIN_H_mini_Mod3,
+                                      y = DaTRAIN_H_mini_Mod3$Pobre_dummy,
+                                      ## keep the class variable name the same:
+                                      yname = "Pobre_dummy")
+
+table(downSampled_Train_HMod3$Pobre_dummy)
+
+set.seed(10101)
+logit_lasso_downsampleMod3 <- train(
+  Pobre_dummy ~Lp + OcVivl*Npersug,
+  data = downSampled_Train_HMod3,
+  method = "glmnet",
+  trControl = ctrl_def_Mod3,
+  family = "binomial",
+  metric = "ROC",
+  tuneGrid = expand.grid(alpha = 0,lambda=lambdasMod3),
+  preProcess = c("center", "scale")
+)
+
+logit_lasso_downsampleMod3
+
+#SMOTE resampling
+install.packages("smotefamily")
+library(smotefamily)
+require("smotefamily")
+predictorsMod1<-c("OcVivl") 
+
+head(DaTRAIN_H_mini_Mod1[predictorsMod3])
+
+######################################################################################################
+salida_smoteMod1 = SMOTE(X = DaTRAIN_H_mini_Mod1[predictorsMod1], #No está funcionando porque las variables no son numéricas
+                         target = DaTRAIN_H_mini_Mod1$Pobre_dummy)
+Oversampled_dataMod1 = salida_smoteMod1$data
+table(DaTRAIN_H_mini_Mod1$Pobre_dummy)
+table(Oversampled_dataMod1$class)
+
+set.seed(10101)
+logit_lasso_smoteMod1<- train(
+  class ~factor(Dominio),
+  data = Oversampled_dataMod1,
+  method = "glmnet",
+  trControl = ctrl_def_Mod1,
+  family = "binomial",
+  metric = "ROC",
+  tuneGrid = expand.grid(alpha = 0,lambda=lambdasMod1),
+  preProcess = c("center", "scale")
+)
+#################################################################################################
+
+
+testResultsMod3 <- data.frame(Pobre = Testing_H_Mod3$Pobre_dummy)
+testResultsMod3$logitm3<- predict(logit_caret_Mod3,
+                                  newdata = Testing_H_Mod1,
+                                  type = "prob")[,1]
+testResultsMod1$lassom3<- predict(logit_lasso_rocMod3,
+                                  newdata = Testing_H_Mod3,
+                                  type = "prob")[,1]
+testResultsMod1$lasso_threshm3<- predict(logit_lasso_rocMod3,
+                                         newdata = Testing_H_Mod3,
+                                         type = "prob")[,1]
+testResultsMod1$lasso_upsamplem3<- predict(logit_lasso_upsampleMod3,
+                                           newdata = Testing_H_Mod3,
+                                           type = "prob")[,1]
+testResultsMod1$mylogit_lasso_downsamplem3<- predict(logit_lasso_downsampleMod3,
+                                                     newdata = Testing_H_Mod3,
+                                                     type = "prob")[,1]
+#################################################################################################
+testResults$mylogit lasso smote<- predict(mylogit lasso smote,
+                                          newdata = testing,
+                                          type = "prob")[,1]
+##################################################################################################
+
+testResultsMod3<-testResultsMod3 %>%
+  mutate(logitm3=ifelse(logitm3>0.5,"Si","No"),
+         lassom3=ifelse(lassom3>0.5,"Si","No"),
+         lasso_threshm3=ifelse(lasso_threshm3>rf_Thresh$threshold,"Si","No"),
+         lasso_upsamplem3=ifelse(lasso_upsamplem3>0.5,"Si","No"),
+         mylogit_lasso_downsamplem3=ifelse(mylogit_lasso_downsamplem3>0.5,"Si","No")#,
+         #mylogit lasso smote=ifelse(mylogit lasso smote>0.5,"Si","No"),
+  )
+
+with(testResultsMod1,table(Pobre,logitm3))
+with(testResultsMod1,table(Pobre,lassom3))
+with(testResultsMod1,table(Pobre,lasso_threshm3))
+with(testResultsMod1,table(Pobre,lasso_upsamplem3))
+with(testResultsMod1,table(Pobre,mylogit_lasso_downsamplem3))
 Mod_log_3 <- stats::glm(model3,family=binomial(link = "logit"), data= DaTRAIN_H)
-tidy(Mod_log_2)
+tidy(Mod_log_3)
 #Predicción
 ###Prediccion
 DaTRAIN_H$PredMod_Log_3 <- stats::predict.glm(Mod_log_3 , newdata= DaTRAIN_H, type="response")
