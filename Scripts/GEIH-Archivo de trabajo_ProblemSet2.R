@@ -160,7 +160,7 @@ table(DaTRAIN_H$Pobre)
 library(stargazer)
 
 DaTRAIN_H<-DaTRAIN_H %>% mutate(Pobre_dummy=factor(Pobre,levels=c(1,0), labels=c("Si", "No")))
-
+table(DaTRAIN_H$Pobre_dummy)
 #Se dividirá la base Training personas para obtener las siguientes bases: otra train, mini test y la evaluation para calcular el ROC
 require(caret)
 set.seed(10101)
@@ -384,6 +384,212 @@ df_coeficientes %>%
   theme(axis.text.x = element_text(size = 5, angle = 45))
 #Modelo1
 model1 <- as.formula("Pobre ~ OcVivl")
+#Se dividirá la base Training personas para obtener las siguientes bases: otra train, mini test y la evaluation para calcular el ROC
+require(caret)
+set.seed(10101)
+Split_1Mod1<- createDataPartition(DaTRAIN_H$Pobre, p = .7) [[1]]
+length(Split_1Mod1)
+other_Mod1 <- DaTRAIN_H[-Split_1Mod1,]
+DaTRAIN_H_mini_Mod1<- DaTRAIN_H[ Split_1Mod1,] #Base mini train
+
+set.seed(10101)
+Split_2Mod1<- createDataPartition(other_Mod1$Pobre, p = 1/3) [[1]]
+Evaluation_H_Mod1 <- other_Mod1[ Split_2Mod1,] #Base evaluacion para ROC
+Testing_H_Mod1 <- other_Mod1[-Split_2Mod1,] #Base mini test
+
+#Se realiza el K-fold como método de control del modelo
+Varios_parametrosMod1<-function(...)c(twoClassSummary(...), defaultSummary(...))
+
+ctrl_def_Mod1 <- trainControl(method = "cv",
+                              number = 5,
+                              summaryFunction = Varios_parametrosMod1,
+                              classProbs = TRUE,
+                              verbose=FALSE,
+                              savePredictions = T)
+#logit
+set.seed(10101)
+#Se realiza el modelo de clasificacón con la base de control 
+logit_caret_Mod1 <- train(
+  Pobre_dummy ~factor(OcVivl),
+  data =DaTRAIN_H_mini_Mod1 ,
+  method = "glm", #Para logit
+  trControl = ctrl_def_Mod1,
+  family = "binomial",
+  preProcess = c("center", "scale"))
+logit_caret_Mod1
+
+#Lambdas para Lasso
+lambdasMod1<- 10^seq(-4, 0.01, length = 200)
+
+#Ahora, se hará la prueba tomando como métrica la Sensibilidad
+set.seed(10101)
+logit_lasso_SensMod1 <- train(
+  Pobre_dummy ~factor(OcVivl),
+  data = DaTRAIN_H_mini_Mod1,
+  method = "glmnet",
+  trControl = ctrl_def_Mod1,
+  family = "binomial",
+  metric = "Sens",
+  tuneGrid = expand.grid(alpha = 0,lambda=lambdasMod1),
+  preProcess = c("center", "scale"))
+
+logit_lasso_SensMod1
+
+#Ahora, se hará la prueba tomando como métrica el ROC
+
+set.seed(10101)
+logit_lasso_rocMod1 <- train(
+  Pobre_dummy ~factor(OcVivl),
+  data = DaTRAIN_H_mini_Mod1,
+  method = "glmnet",
+  trControl = ctrl_def_Mod1,
+  family = "binomial",
+  metric = "ROC",
+  tuneGrid = expand.grid(alpha = 0,lambda=lambdasMod1),
+  preProcess = c("center", "scale"))
+
+logit_lasso_rocMod1
+
+#Calcularemos la regla para realizar la clasificación (Cut off)
+
+Eval_ResultadosMod1 <- data.frame(Pobre = Evaluation_H_Mod1$Pobre_dummy)
+Eval_ResultadosMod1$Roc <- predict(logit_lasso_rocMod1,
+                               newdata = Evaluation_H_Mod1,
+                               type = "prob")[,1]
+
+install.packages("pROC")
+library(pROC)
+#Se calcula el ROC para la regresión
+rf_ROCMod1 <- roc(Eval_ResultadosMod1$Pobre, Eval_ResultadosMod1$Roc, levels = rev(levels(Eval_ResultadosMod1$Pobre)))
+
+rf_ROCMod1
+
+#Se calcula el Cut off
+rf_ThreshMod1 <- coords(rf_ROCMod1, x = "best", best.method = "closest.topleft")
+rf_ThreshMod1
+
+#Se evalúan los resultados
+Eval_ResultadosMod1<-Eval_ResultadosMod1 %>% mutate(hat_def_05Mod1=ifelse(Eval_ResultadosMod1$Roc>0.5,"Si","No"),
+                                            hat_def_rf_ThreshMod1=ifelse(Eval_ResultadosMod1$Roc>rf_ThreshMod1$threshold,"Si","No"))
+
+
+#Cuando el threshold es igual a 0.5 (regla de Bayes)
+with(Eval_ResultadosMod1,table(Pobre,hat_def_05Mod1))
+#Cuando el threshold es obtenido del ROC
+with(Eval_ResultadosMod1,table(Pobre,hat_def_rf_ThreshMod1))
+
+#Up-sampling
+set.seed(10101)
+upSampled_Train_HMod1<- upSample(x = DaTRAIN_H_mini_Mod1,
+                              y = DaTRAIN_H_mini_Mod1$Pobre_dummy,
+                              ## Mantener la variable de clasificación con el mismo nombre:
+                              yname = "Pobre_dummy")
+
+dim(upSampled_Train_HMod1)
+table(upSampled_Train_HMod1$Pobre_dummy)
+
+set.seed(10101)
+logit_lasso_upsampleMod1 <- train(
+  Pobre_dummy ~factor(OcVivl),
+  data = upSampled_Train_HMod1,
+  method = "glmnet",
+  trControl = ctrl_def_Mod1,
+  family = "binomial",
+  metric = "ROC",
+  tuneGrid = expand.grid(alpha = 0,lambda=lambdasMod1),
+  preProcess = c("center", "scale")
+)
+logit_lasso_upsampleMod1
+
+#Down-sampling
+set.seed(10101)
+downSampled_Train_HMod1 <- downSample(x = DaTRAIN_H_mini_Mod1,
+                                  y = DaTRAIN_H_mini_Mod1$Pobre_dummy,
+                                  ## keep the class variable name the same:
+                                  yname = "Pobre_dummy")
+
+table(downSampled_Train_HMod1$Pobre_dummy)
+
+set.seed(10101)
+logit_lasso_downsampleMod1 <- train(
+  Pobre_dummy ~factor(OcVivl),
+  data = downSampled_Train_HMod1,
+  method = "glmnet",
+  trControl = ctrl_def_Mod1,
+  family = "binomial",
+  metric = "ROC",
+  tuneGrid = expand.grid(alpha = 0,lambda=lambdasMod1),
+  preProcess = c("center", "scale")
+)
+
+logit_lasso_downsampleMod1
+
+#SMOTE resampling
+install.packages("smotefamily")
+library(smotefamily)
+require("smotefamily")
+predictorsMod1<-c("OcVivl") 
+
+head(DaTRAIN_H_mini_Mod1[predictorsMod1])
+
+######################################################################################################
+salida_smoteMod1 = SMOTE(X = DaTRAIN_H_mini_Mod1[predictorsMod1], #No está funcionando porque las variables no son numéricas
+                     target = DaTRAIN_H_mini_Mod1$Pobre_dummy)
+Oversampled_dataMod1 = salida_smoteMod1$data
+table(DaTRAIN_H_mini_Mod1$Pobre_dummy)
+table(Oversampled_dataMod1$class)
+
+set.seed(10101)
+logit_lasso_smoteMod1<- train(
+  class ~factor(Dominio),
+  data = Oversampled_dataMod1,
+  method = "glmnet",
+  trControl = ctrl_def_Mod1,
+  family = "binomial",
+  metric = "ROC",
+  tuneGrid = expand.grid(alpha = 0,lambda=lambdasMod1),
+  preProcess = c("center", "scale")
+)
+#################################################################################################
+
+
+testResultsMod1 <- data.frame(Pobre = Testing_H_Mod1$Pobre_dummy)
+testResultsMod1$logit<- predict(logit_caret_Mod1,
+                            newdata = Testing_H_Mod1,
+                            type = "prob")[,1]
+testResultsMod1$lasso<- predict(logit_lasso_rocMod1,
+                            newdata = Testing_H_Mod1,
+                            type = "prob")[,1]
+testResultsMod1$lasso_thresh<- predict(logit_lasso_rocMod1,
+                                   newdata = Testing_H_Mod1,
+                                   type = "prob")[,1]
+testResultsMod1$lasso_upsample<- predict(logit_lasso_upsampleMod1,
+                                     newdata = Testing_H_Mod1,
+                                     type = "prob")[,1]
+testResultsMod1$mylogit_lasso_downsample<- predict(logit_lasso_downsampleMod1,
+                                               newdata = Testing_H_Mod1,
+                                               type = "prob")[,1]
+#################################################################################################
+testResults$mylogit lasso smote<- predict(mylogit lasso smote,
+                                          newdata = testing,
+                                          type = "prob")[,1]
+##################################################################################################
+
+testResultsMod1<-testResultsMod1 %>%
+  mutate(logit=ifelse(logit>0.5,"Si","No"),
+         lasso=ifelse(lasso>0.5,"Si","No"),
+         lasso_thresh=ifelse(lasso_thresh>rf_Thresh$threshold,"Si","No"),
+         lasso_upsample=ifelse(lasso_upsample>0.5,"Si","No"),
+         mylogit_lasso_downsample=ifelse(mylogit_lasso_downsample>0.5,"Si","No")#,
+         #mylogit lasso smote=ifelse(mylogit lasso smote>0.5,"Si","No"),
+  )
+
+with(testResultsMod1,table(Pobre,logit))
+with(testResultsMod1,table(Pobre,lasso))
+with(testResultsMod1,table(Pobre,lasso_thresh))
+with(testResultsMod1,table(Pobre,lasso_upsample))
+with(testResultsMod1,table(Pobre,mylogit_lasso_downsample))
+##
 xmod1<- model.matrix(~OcVivl, DaTRAIN_H)
 ymod1 <- DaTRAIN_H$Pobre
 lasso.mod1 <- glmnet(xmod1, ymod1, alpha = 1 , lambda = 0.02)
