@@ -144,62 +144,13 @@ mean(P5000)
 modeLp <- function(P5000){
   return(as.numeric(names(which.max(table(P5000)))))
 }
+
 modeLp(P5000)
 summary(P5000)
 #Llamamos las librerias
 ###Clasificación
 table(DaTRAIN_H$Pobre)
-#Ridge y Lasso.
-set.seed(10101)
-
-xmodRi<- model.matrix(~Npersug+Lp + factor(Dominio)+P5000+factor(OcVivl), DaTRAIN_H)
-ymodRi <- DaTRAIN_H$Pobre
-Ri.mod1 <- glmnet(xmodRi, ymodRi, alpha = 1 , lambda = 0.03)
-modeloRi <- glmnet(
-  x           = xmodRi,
-  y           = ymodRi,
-  alpha       = 0,
-  nlambda     = 100,
-  standardize = TRUE
-)
-regmodRi <- modeloRi$beta %>% 
-  as.matrix() %>%
-  t() %>% 
-  as_tibble() %>%
-  mutate(lambda = modeloRi$lambda)
-regmodRi <- regmodRi %>%
-  pivot_longer(
-    cols = !lambda, 
-    names_to = "predictor",
-    values_to = "coeficientes"
-  )
-
-regmodRi %>%
-  ggplot(aes(x = lambda, y = coeficientes, color = predictor)) +
-  geom_line() +
-  scale_x_log10(
-    breaks = trans_breaks("log10", function(x) 10^x),
-    labels = trans_format("log10", math_format(10^.x))
-  ) +
-  labs(title = "Coeficientes del modelo en función de la regularización") +
-  theme_bw() +
-  theme(legend.position = "none")
-
-set.seed(10101)
-cv_errormodRi <- cv.glmnet(
-  x           = xmodRi,
-  y           = ymodRi,
-  alpha  = 0,
-  nfolds = 10,
-  type.measure = "mse",
-  standardize  = TRUE
-)
-
-plot(cv_errormodRi)
-paste("Mejor valor de lambda encontrado:", cv_errormodRi$lambda.min)
-# Mayor valor de lambda con el que el test-error no se aleja más de 1sd del mínimo.
-paste("Mejor valor de lambda encontrado + 1 desviación estándar:", cv_errormodRi$lambda.1se)
- ##
+#Ridge y Lasso para modelo de Clasificación
 
 
 #lasso.mod1
@@ -207,6 +158,219 @@ paste("Mejor valor de lambda encontrado + 1 desviación estándar:", cv_errormod
 #tidy(modeloR)
 #modeloR
 library(stargazer)
+
+DaTRAIN_H<-DaTRAIN_H %>% mutate(Pobre_dummy=factor(Pobre,levels=c(1,0), labels=c("Si", "No")))
+
+#Se dividirá la base Training personas para obtener las siguientes bases: otra train, mini test y la evaluation para calcular el ROC
+require(caret)
+set.seed(10101)
+Split_1 <- createDataPartition(DaTRAIN_H$Pobre, p = .7) [[1]]
+length(Split_1)
+
+other_ <- DaTRAIN_H[-Split_1,]
+DaTRAIN_H_mini<- DaTRAIN_H[ Split_1,] #Base mini train
+
+set.seed(10101)
+Split_2<- createDataPartition(other_$Pobre, p = 1/3) [[1]]
+Evaluation_H <- other_[ Split_2,] #Base evaluacion para ROC
+Testing_H <- other_[-Split_2,] #Base mini test
+
+#Se realiza el K-fold como método de control del modelo
+
+Varios_parametros<-function(...)c(twoClassSummary(...), defaultSummary(...))
+
+ctrl_def_modg <- trainControl(method = "cv",
+                         number = 5,
+                         summaryFunction = Varios_parametros,
+                         classProbs = TRUE,
+                         verbose=FALSE,
+                         savePredictions = T)
+#logit
+set.seed(10101)
+#Se realiza el modelo de clasificacón con la base de control 
+logit_caret_modg <- train(
+  Pobre_dummy ~Npersug+Lp +factor(OcVivl)+ factor(Dominio)+P5000,
+  data =DaTRAIN_H_mini ,
+  method = "glm", #Para logit
+  trControl = ctrl_def_modg,
+  family = "binomial",
+  preProcess = c("center", "scale"))
+
+logit_caret_modg
+
+#Lambdas para Lasso
+lambdas <- 10^seq(-4, 0.01, length = 200)
+
+#Ahora, se hará la prueba tomando como métrica la Sensibilidad
+set.seed(10101)
+logit_lasso_acc <- train(
+  Pobre_dummy ~Npersug+Lp +factor(OcVivl)+ factor(Dominio)+P5000,
+  data = DaTRAIN_H_mini,
+  method = "glmnet",
+  trControl = ctrl_def_modg,
+  family = "binomial",
+  metric = "Sens",
+  tuneGrid = expand.grid(alpha = 0,lambda=lambdas),
+  preProcess = c("center", "scale"))
+
+logit_lasso_acc
+
+#Ahora, se hará la prueba tomando como métrica el ROC
+
+set.seed(10101)
+logit_lasso_roc <- train(
+  Pobre_dummy ~Npersug+Lp +factor(OcVivl)+ factor(Dominio)+P5000,
+  data = DaTRAIN_H_mini,
+  method = "glmnet",
+  trControl = ctrl_def_modg,
+  family = "binomial",
+  metric = "ROC",
+  tuneGrid = expand.grid(alpha = 0,lambda=lambdas),
+  preProcess = c("center", "scale"))
+
+logit_lasso_roc
+
+#Calcularemos la regla para realizar la clasificación (Cut off)
+
+Eval_Resultados <- data.frame(Pobre = Evaluation_H$Pobre_dummy)
+Eval_Resultados$Roc <- predict(logit_lasso_roc,
+                           newdata = Evaluation_H,
+                           type = "prob")[,1]
+
+library(pROC)
+#Se calcula el ROC para la regresión
+rf_ROC <- roc(Eval_Resultados$Pobre, Eval_Resultados$Roc, levels = rev(levels(Eval_Resultados$Pobre)))
+
+rf_ROC
+
+#Se calcula el Cut off
+rf_Thresh <- coords(rf_ROC, x = "best", best.method = "closest.topleft")
+rf_Thresh
+
+#Se evalúan los resultados
+Eval_Resultados<-Eval_Resultados %>% mutate(hat_def_05=ifelse(Eval_Resultados$Roc>0.5,"Si","No"),
+                                    hat_def_rf_Thresh=ifelse(Eval_Resultados$Roc>rf_Thresh$threshold,"Si","No"))
+
+#Cuando el threshold es igual a 0.5 (regla de Bayes)
+with(Eval_Resultados,table(Pobre,hat_def_05))
+#Cuando el threshold es obtenido del ROC
+with(Eval_Resultados,table(Pobre,hat_def_rf_Thresh))
+
+#Up-sampling
+set.seed(10101)
+upSampled_Train_H <- upSample(x = DaTRAIN_H_mini,
+                           y = DaTRAIN_H_mini$Pobre_dummy,
+                           ## Mantener la variable de clasificación con el mismo nombre:
+                           yname = "Pobre_dummy")
+
+dim(upSampled_Train_H)
+table(upSampled_Train_H$Pobre_dummy)
+
+set.seed(10101)
+logit_lasso_upsample <- train(
+  Pobre_dummy ~Npersug+Lp +factor(OcVivl)+ factor(Dominio)+P5000,
+  data = upSampled_Train_H,
+  method = "glmnet",
+  trControl = ctrl_def_modg,
+  family = "binomial",
+  metric = "ROC",
+  tuneGrid = expand.grid(alpha = 0,lambda=lambdas),
+  preProcess = c("center", "scale")
+)
+logit_lasso_upsample
+
+#Down-sampling
+set.seed(10101)
+downSampled_Train_H <- downSample(x = DaTRAIN_H_mini,
+                               y = DaTRAIN_H_mini$Pobre_dummy,
+                               ## keep the class variable name the same:
+                               yname = "Pobre_dummy")
+
+table(downSampled_Train_H$Pobre_dummy)
+
+set.seed(10101)
+logit_lasso_downsample <- train(
+  Pobre_dummy ~Npersug+Lp +factor(OcVivl)+ factor(Dominio)+P5000,
+  data = downSampled_Train_H,
+  method = "glmnet",
+  trControl = ctrl_def_modg,
+  family = "binomial",
+  metric = "ROC",
+  tuneGrid = expand.grid(alpha = 0,lambda=lambdas),
+  preProcess = c("center", "scale")
+)
+
+logit_lasso_downsample
+
+#SMOTE resampling
+
+require("smotefamily")
+predictors<-c("Npersug","Lp","OcVivl", "Dominio","P5000") 
+            
+head(DaTRAIN_H_mini[predictors])
+
+######################################################################################################
+salida_smote = SMOTE(X = DaTRAIN_H_mini[predictors], #No está funcionando porque las variables no son numéricas
+                     target = DaTRAIN_H_mini$Pobre_dummy)
+Oversampled_data = salida_smote$data
+table(DaTRAIN_H_mini$Pobre_dummy)
+table(Oversampled_data$class)
+
+set.seed(10101)
+logit_lasso_smote<- train(
+  class ~Npersug+Lp +factor(OcVivl)+ factor(Dominio)+P5000,
+  data = Oversampled_data,
+  method = "glmnet",
+  trControl = ctrl_def_modg,
+  family = "binomial",
+  metric = "ROC",
+  tuneGrid = expand.grid(alpha = 0,lambda=lambdas),
+  preProcess = c("center", "scale")
+)
+#################################################################################################
+
+
+testResults <- data.frame(Pobre = Testing_H$Pobre_dummy)
+testResults$logit<- predict(logit_caret_modg,
+                            newdata = Testing_H,
+                            type = "prob")[,1]
+testResults$lasso<- predict(logit_lasso_roc,
+                            newdata = Testing_H,
+                            type = "prob")[,1]
+testResults$lasso_thresh<- predict(logit_lasso_roc,
+                                   newdata = Testing_H,
+                                   type = "prob")[,1]
+testResults$lasso_upsample<- predict(logit_lasso_upsample,
+                                     newdata = Testing_H,
+                                     type = "prob")[,1]
+testResults$mylogit_lasso_downsample<- predict(logit_lasso_downsample,
+                                               newdata = Testing_H,
+                                               type = "prob")[,1]
+#################################################################################################
+testResults$mylogit lasso smote<- predict(mylogit lasso smote,
+                                          newdata = testing,
+                                          type = "prob")[,1]
+##################################################################################################
+
+testResults<-testResults %>%
+  mutate(logit=ifelse(logit>0.5,"Si","No"),
+         lasso=ifelse(lasso>0.5,"Si","No"),
+         lasso_thresh=ifelse(lasso_thresh>rf_Thresh$threshold,"Si","No"),
+         lasso_upsample=ifelse(lasso_upsample>0.5,"Si","No"),
+         mylogit_lasso_downsample=ifelse(mylogit_lasso_downsample>0.5,"Si","No")#,
+         #mylogit lasso smote=ifelse(mylogit lasso smote>0.5,"Si","No"),
+  )
+
+with(testResults,table(Pobre,logit))
+with(testResults,table(Pobre,lasso))
+with(testResults,table(Pobre,lasso_thresh))
+with(testResults,table(Pobre,lasso_upsample))
+with(testResults,table(Pobre,mylogit_lasso_downsample))
+
+
+##Termina! por el 07-07-2022
+
+
 stargazer(regmodRi,type = "text")
 mr_coeficientes <- modeloR$coefficients %>%
   enframe(name = "predictor", value = "coeficiente")
@@ -318,3 +482,62 @@ library(scales)
 
 #Ahora reescalamos un variable de la base de datos
 rescale(DaTRAIN_H$OcVivl)
+
+
+
+##Modelo de regresión 
+
+xmodRi<- model.matrix(~Npersug+Lp + factor(Dominio)+P5000+factor(OcVivl), DaTRAIN_H)
+ymodRi <- DaTRAIN_H$Pobre
+Ri.mod1 <- glmnet(xmodRi, ymodRi, alpha = 1 , lambda = 0.03)
+modeloRi <- glmnet(
+  x           = xmodRi,
+  y           = ymodRi,
+  alpha       = 0,
+  nlambda     = 100,
+  standardize = TRUE
+)
+regmodRi <- modeloRi$beta %>% 
+  as.matrix() %>%
+  t() %>% 
+  as_tibble() %>%
+  mutate(lambda = modeloRi$lambda)
+regmodRi <- regmodRi %>%
+  pivot_longer(
+    cols = !lambda, 
+    names_to = "predictor",
+    values_to = "coeficientes"
+  )
+
+regmodRi %>%
+  ggplot(aes(x = lambda, y = coeficientes, color = predictor)) +
+  geom_line() +
+  scale_x_log10(
+    breaks = trans_breaks("log10", function(x) 10^x),
+    labels = trans_format("log10", math_format(10^.x))
+  ) +
+  labs(title = "Coeficientes del modelo en función de la regularización") +
+  theme_bw() +
+  theme(legend.position = "none")
+
+set.seed(10101)
+cv_errormodRi <- cv.glmnet(
+  x           = xmodRi,
+  y           = ymodRi,
+  alpha  = 0,
+  nfolds = 10,
+  type.measure = "mse",
+  standardize  = TRUE
+)
+
+plot(cv_errormodRi)
+paste("Mejor valor de lambda encontrado:", cv_errormodRi$lambda.min)
+# Mayor valor de lambda con el que el test-error no se aleja más de 1sd del mínimo.
+paste("Mejor valor de lambda encontrado + 1 desviación estándar:", cv_errormodRi$lambda.1se)
+##
+
+
+
+
+
+
