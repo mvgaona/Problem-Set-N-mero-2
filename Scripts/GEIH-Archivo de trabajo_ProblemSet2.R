@@ -7,9 +7,6 @@
 #para el desarrollo del Problem Set, específicamente puntos 1 y 2.
 
 install.packages("pacman") #Instalar librería si no cuenta con esta 
-install.packages("caret")
-install.packages("Matrix")
-install.packages("recipes")
 library(pacman) #Llamar librería
 #Se sacaran de p_load las siguientes librerias: e1071 ,EnvStats,knitr,kableExtra,foreign,ISLR2,
 p_load(caret, 
@@ -46,7 +43,7 @@ library(readr)
 
 #Se debe poner el directorio de donde está el script:
 #Session-> Set Working directory -> To source file location, para lo cual se debe descargar el repositorioDatos_test_hogares<-readRDS("../Elementos_Guardados/test_hogares.rds") #Guardar las bases de datos
-setwd("C:/Users/valer/Desktop/Andes/Intersemestral/Big Data/Problem Set 2/Problem-Set-2/Scripts")
+#setwd("C:/Users/valer/Desktop/Andes/Intersemestral/Big Data/Problem Set 2/Problem-Set-2/Scripts")
 DTEST_P<-data.frame(readRDS("../Elementos_Guardados/test_personas.rds"))  #Guardar las bases de datos
 DTEST_H <- data.frame(readRDS("../Elementos_Guardados/test_hogares.rds"))
 DTRAIN_H<-data.frame(readRDS("../Elementos_Guardados/train_hogares.rds")) #Guardar las bases de datos
@@ -154,8 +151,6 @@ summary(P5000)
 ###Clasificación
 table(DaTRAIN_H$Pobre)
 #Ridge y Lasso para modelo de Clasificación
-
-
 #lasso.mod1
 #lasso.mod1$beta
 #tidy(modeloR)
@@ -1527,45 +1522,87 @@ rescale(DaTRAIN_H$OcVivl)
 
 #Se realizará la división del data set de "training" en 2, una base de mini training y otra para mini test, con el fin de poder calcular
 #los MSE en términos de una variable predicha.
+DTRAIN_HR <- data.frame()
+DTRAIN_HR<- subset(DTRAIN_H, select = c("id", "Ingtotugarr","Ingtotug", "Ingpcug", "Npersug", "Lp", "Dominio", "Pobre", "P5090", "P5000"))
+DTEST_HR<- data.frame()
+DTEST_HR<- subset(DTEST_H, select = c("id", "Npersug", "Lp", "Dominio", "P5090", "P5000"))
+DTEST_PR <- data.frame()
+DTEST_PR<- subset(DTEST_P, select = c("id", "P6210", "P6020", "P6040", "Dominio", "Oficio"))
+DTRAIN_PR<- data.frame()
+DTRAIN_PR<- subset(DTRAIN_P, select = c("id", "P6210", "P6020", "P6040", "Dominio", "Oficio", "Ingtot"))
+
+cantidad_naR <- sapply(DTRAIN_HR, function(x) sum(is.na(x)))
+cantidad_naR <- data.frame(cantidad_naR)
+porcentaje_naR <- cantidad_naR/nrow(DTRAIN_HR)
+porcentaje_naR <-porcentaje_naR*100
+porcentaje_naR 
+cantidad_naPR <- sapply(DTRAIN_PR, function(x) sum(is.na(x)))
+cantidad_naPR <- data.frame(cantidad_naPR)
+porcentaje_naPR <- cantidad_naPR/nrow(DTRAIN_PR)
+porcentaje_naPR <-porcentaje_naPR*100
+porcentaje_naPR 
+
+DTRAIN_PR$Oficio[is.na(DTRAIN_PR$Oficio)] = 0 
+DTRAIN_PR$P6210[is.na(DTRAIN_PR$P6210)] = 9 
+DTRAIN_PR$Ingtot[is.na(DTRAIN_PR$Ingtot)] = 0 
+
+cantidad_naPRT <- sapply(DTEST_PR, function(x) sum(is.na(x)))
+cantidad_naPRT <- data.frame(cantidad_naPRT)
+porcentaje_naPRT <- cantidad_naPRT/nrow(DTEST_PR)
+porcentaje_naPRT <-porcentaje_naPRT*100
+porcentaje_naPRT 
+
+DTEST_PR$Oficio[is.na(DTEST_PR$Oficio)] = 0 
+DTEST_PR$P6210[is.na(DTEST_PR$P6210)] = 9 
+
+#Descripción
+Edad <- DTRAIN_PR$P6040
+Sexo <- DTRAIN_PR$P6020
+Educ <- DTRAIN_PR$P6210
+Edad2 <- (DTRAIN_PR$Edad)^2 
+View(DTRAIN_PR)
+DTRAIN_PR <- cbind(DTRAIN_PR, Edad)
+DTRAIN_PR <- cbind(DTRAIN_PR, Edad2)
+DTRAIN_PR <- cbind(DTRAIN_PR, Sexo, Educ)
+
+View(DTRAIN_PR)
+DTRAIN_PR <- DTRAIN_PR %>% #Se vuelven categóricas las variables que así lo sean en la BD
+  mutate_at(.vars = c(
+    "Sexo", "Educ", "Dominio", "Oficio"),
+    .funs = factor)
+SexoT <- DTEST_PR$P6020
+EdadT<- DTEST_PR$P6040
+EducT <- DTEST_PR$P6210
+Edad2T <- (DTEST_PR$EdadT)^2
+
+
+DTEST_PR <- cbind(DTEST_PR, EdadT, SexoT, EducT, Edad2T)
+View(DTEST_PR)
+DTEST_PR <- DTEST_PR %>% #Se vuelven categóricas las variables que así lo sean en la BD
+  mutate_at(.vars = c(
+    "SexoT", "EducT", "Dominio", "Oficio"),
+    .funs = factor)
 
 set.seed(10101)
-id_train_subset_H <- sample(1:nrow(DTRAIN_H), size = 0.7*nrow(DTRAIN_H), replace = FALSE)
-id_train_subset_P <- sample(1:nrow(DTRAIN_P), size = 0.7*nrow(DTRAIN_P), replace = FALSE)
+id_train_subset_H <- sample(1:nrow(DTRAIN_HR), size = 0.7*nrow(DTRAIN_HR), replace = FALSE)
+id_train_subset_P <- sample(1:nrow(DTRAIN_PR), size = 0.7*nrow(DTRAIN_PR), replace = FALSE)
 
-datos_subtrain_H <- datos[id_train_subset_H, ]
-datos_subtest_H  <- datos[-id_train_subset_H, ]
+datos_subtrain_H <- DTRAIN_HR[id_train_subset_H, ]
+datos_subtest_H  <- DTRAIN_HR[-id_train_subset_H, ]
 
-datos_subtrain_P <- datos[id_train_subset_P, ]
-datos_subtest_P  <- datos[-iid_train_subset_P, ]
-
+datos_subtrain_P <- DTRAIN_PR[id_train_subset_P, ]
+datos_subtest_P  <- DTRAIN_PR[-id_train_subset_P, ]
 
 #Se hará regresión con respecto al Ingtot por cada persona de la unidad de gasto
-model_base_1 <- lm(Ingtot ~ ., data = datos_subtrain_P)
+model_base_1 <- lm(Ingtot ~ Edad + Edad2 + Sexo + factor(Educ) + factor (Oficio) + factor (Dominio), data = datos_subtrain_P)
 summary(model_base_1)
-
-#Se hará regresión con respecto al Ingtotugarr (ingresos por unidad de gasto con imputación de arriendo) por cada hogar
-model_base_2 <- lm(Ingtotugarr ~ ., data = datos_subtrain_H)
-summary(model_base_2)
 
 #Se visualizan los coeficientes de OLS para el modelo 1
 stargazer(model_base_1,type = "text")
 modelb1_coeficientes <- model_base_1$coefficients %>%
   enframe(name = "predictor", value = "coeficiente")
 
-df_coeficientes_mb1 %>%
-  filter(predictor != "(Intercept)") %>%
-  ggplot(aes(x = predictor, y = coeficiente)) +
-  geom_col() +
-  labs(title = "Coeficientes del modelo OLS para modelo 1") +
-  theme_bw() +
-  theme(axis.text.x = element_text(size = 5, angle = 45))
-
-#Se visualizan los coeficientes de OLS para el modelo 2
-stargazer(model_base_2,type = "text")
-modelb2_coeficientes <- model_base_2$coefficients %>%
-  enframe(name = "predictor", value = "coeficiente")
-
-df_coeficientes_mb2 %>%
+modelb1_coeficientes %>%
   filter(predictor != "(Intercept)") %>%
   ggplot(aes(x = predictor, y = coeficiente)) +
   geom_col() +
@@ -1582,14 +1619,6 @@ predicciones_train_mb1 <- predict(model_base_1, newdata = datos_subtrain_P)
 training_mse_mb1 <- mean((predicciones_train_mb1 - datos_subtrain_P$Ingtot)^2)
 paste("Error (mse) de entrenamiento modelo 1:", training_mse_mb1)
 
-# Predicciones de entrenamiento para modelo 2
-# ==============================================================================
-predicciones_train_mb2 <- predict(model_base_2, newdata = datos_subtrain_H)
-
-# MSE de entrenamiento para modelo 2
-# ==============================================================================
-training_mse_mb2 <- mean((predicciones_train_mb2 - datos_subtrain_H$Ingtotugarr)^2)
-paste("Error (mse) de entrenamiento modelo 2:", training_mse_mb2)
 
 # Predicciones de test modelo 1
 # ==============================================================================
@@ -1599,33 +1628,16 @@ predicciones_test_mb1 <- predict(model_base_1, newdata = datos_subtest_P)
 # ==============================================================================
 test_mse_ols_mb1 <- mean((predicciones_test_mb1 - datos_subtest_P$Ingtot)^2)
 paste("Error (mse) de test modelo 1:", test_mse_ols_mb1)
-
-# Predicciones de test modelo 2
-# ==============================================================================
-predicciones_test_mb2 <- predict(model_base_2, newdata = datos_subtest_H)
-
-# MSE de test modelo 2
-# ==============================================================================
-test_mse_ols_mb2 <- mean((predicciones_test_mb2 - datos_subtest_H$Ingtotugarr)^2)
-paste("Error (mse) de test modelo 2:", test_mse_ols_mb2)
-
-#Se tiene overfitting para los modelos, debido a que el MSE del train es menor que el arrojado en el test
-
 ## Se realizará la regularización Ridge para ambos modelos
 
 #Para el modelo 1
-x_subtrain_P <- model.matrix(Ingtot~., data = datos_subtrain_P)[, -1]
-y_subtrain_P <- datos_subtrain_H$Ingtot
+x_subtrain_P <- model.matrix(Ingtot~ Edad + Edad2 + Sexo + factor(Educ) + factor (Oficio) + factor (Dominio), data = datos_subtrain_P)[, -1]
+y_subtrain_P <- datos_subtrain_P$Ingtot
 
-x_subtest_P <- model.matrix(Ingtot~., data = datos_subtrain_P)[, -1]
+x_subtest_P <- model.matrix(Ingtot~ Edad + Edad2 + Sexo + factor(Educ) + factor (Oficio) + factor (Dominio), data = datos_subtrain_P)[, -1]
 y_subtest_P <- datos_subtrain_P$Ingtot
 
-#Para el modelo 2
-x_subtrain_H <- model.matrix(Ingtotugarr~., data = datos_subtrain_H)[, -1]
-y_subtrain_H <- datos_subtrain_H$Ingtotugarr
 
-x_subtest_H <- model.matrix(fat~., data = datos_subtrain_H)[, -1]
-y_subtest_H <- datos_subtrain_H$Ingtotugarr
 
 #Se obtiene ajuste con regularización Ridge para el modelo 1
 modelobase1Ri <- glmnet(
@@ -1700,7 +1712,7 @@ df_coeficientes_mod1_Ri %>%
 
 #Predicciones de entrenamiento
 # ==============================================================================
-predicciones_train_mb1ri <- predict(modelo_1_Ridge, newx = x_train)
+predicciones_train_mb1ri <- predict(modelo_1_Ridge, newx = x_subtrain_P)
 
 # MSE de entrenamiento
 # ==============================================================================
@@ -1791,7 +1803,7 @@ df_coeficientes_mod1lass %>%
   theme_bw() +
   theme(axis.text.x = element_text(size = 6, angle = 45))
 
-df_coefic_mod1_Lass %>%
+df_coeficientes_mod1lass %>%
   filter(
     predictor != "(Intercept)",
     coeficiente != 0
@@ -1816,195 +1828,4 @@ print(paste("Error (mse) de test:", test_mse_mod1_lasso))
 
 
 # ==============================================================================
-#Para el modelo 2 Ridge
-
-modelobase2Ri <- glmnet(
-  x           = x_subtrain_H,
-  y           = y_subtrain_H,
-  alpha       = 0,
-  nlambda     = 200,
-  standardize = TRUE
-)
-regmod2Ri <- modelobase2Ri $beta %>% 
-  as.matrix() %>%
-  t() %>% 
-  as_tibble() %>%
-  mutate(lambda = modelobase2Ri$lambda)
-regmod2Ri  <- regmod2Ri  %>%
-  pivot_longer(
-    cols = !lambda, 
-    names_to = "predictor",
-    values_to = "coeficientes"
-  )
-
-regmod2Ri  %>%
-  ggplot(aes(x = lambda, y = coeficientes, color = predictor)) +
-  geom_line() +
-  scale_x_log10(
-    breaks = trans_breaks("log10", function(x) 10^x),
-    labels = trans_format("log10", math_format(10^.x))
-  ) +
-  labs(title = "Coeficientes del modelo 2 en función de la regularización") +
-  theme_bw() +
-  theme(legend.position = "none")
-
-
-set.seed(10101)
-cv_errormod2Ri <- cv.glmnet(
-  x           = x_subtrain_H,
-  y           = y_subtrain_H,
-  alpha  = 0,
-  nfolds = 10,
-  type.measure = "mse",
-  standardize  = TRUE
-)
-
-plot(cv_errormod2Ri)
-paste("Mejor valor de lambda encontrado:", cv_errormod2Ri$lambda.min)
-# Mayor valor de lambda con el que el test-error no se aleja más de 1sd del mínimo.
-paste("Mejor valor de lambda encontrado + 1 desviación estándar:", cv_errormod2Ri$lambda.1se)
-##
-
-modelo_2_Ridge <- glmnet(
-  x           = x_subtrain_H,
-  y           = y_subtrain_H,
-  alpha       = 0,
-  lambda      = cv_errormod2Ri$lambda.1se,
-  standardize = TRUE
-)
-
-
-# Coeficientes del modelo
-# ==============================================================================
-df_coeficientes_mod2_Ri <- coef(modelo_2_Ridge) %>%
-  as.matrix() %>%
-  as_tibble(rownames = "predictor") %>%
-  rename(coeficiente = s0)
-
-df_coeficientes_mod2_Ri %>%
-  filter(predictor != "(Intercept)") %>%
-  ggplot(aes(x = predictor, y = coeficiente)) +
-  geom_col() +
-  labs(title = "Coeficientes del modelo Ridge") +
-  theme_bw() +
-  theme(axis.text.x = element_text(size = 6, angle = 45))
-
-#Predicciones de entrenamiento
-# ==============================================================================
-predicciones_train_mb2ri <- predict(modelo_2_Ridge, newx = x_subtrain_H)
-
-# MSE de entrenamiento
-# ==============================================================================
-training_mse_mb2ri <- mean((predicciones_train_mb2ri - y_subtrain_H)^2)
-paste("Error (mse) de entrenamiento modelo 2:", training_mse_mb2ri)
-
-
-#Predicción
-predicciones_test_mb2ri <- predict(modelo_2_Ridge, newx = x_subtest_H)
-
-# MSE de test
-# ==============================================================================
-test_mse_mod2ridge <- mean((predicciones_test_mb2ri - y_subtest_H)^2)
-paste("Error (mse) de test:", test_mse_mod2ridge)
-
-#Para el modelo 2 Lasso
-
-modelobase2lass <- glmnet(
-  x           = x_subtrain_H,
-  y           = y_subtrain_H,
-  alpha       = 1,
-  nlambda     = 200,
-  standardize = TRUE
-)
-
-regularizacionmb2lass <- modelobase2lass$beta %>% 
-  as.matrix() %>%
-  t() %>% 
-  as_tibble() %>%
-  mutate(lambda2 = modelobase2lass$lambda)
-
-regularizacionmb2lass <- regularizacionmb2lass %>%
-  pivot_longer(
-    cols = !lambda2, 
-    names_to = "predictor",
-    values_to = "coeficientes"
-  )
-
-regularizacionmb2lass %>%
-  ggplot(aes(x = lambda2, y = coeficientes, color = predictor)) +
-  geom_line() +
-  scale_x_log10(
-    breaks = trans_breaks("log10", function(x) 10^x),
-    labels = trans_format("log10", math_format(10^.x))
-  ) +
-  labs(title = "Coeficientes del modelo 2 en función de la regularización") +
-  theme_bw() +
-  theme(legend.position = "none")
-
-# Evolución del error en función de lambda
-
-set.seed(10101)
-cv_error_m2_Lass <- cv.glmnet(
-  x      = x_subtrain_H,
-  y      = y_subtrain_H,
-  alpha  = 1,
-  nfolds = 10,
-  type.measure = "mse",
-  standardize  = TRUE
-)
-
-plot(cv_error_m2_Lass)
-
-paste("Mejor valor de lambda encontrado para modelo 2:", cv_error_m2_Lass$lambda.min)
-paste("Mejor valor de lambda encontrado + 1 desviación estándar para modelo 2:", cv_error_m2_Lass$lambda.1se)
-
-# Mejor modelo lambda óptimo + 1sd
-# ==============================================================================
-modelo2_Lasso <- glmnet(
-  x           = x_subtrain_H,
-  y           = y_subtrain_H,
-  alpha       = 1,
-  lambda      = cv_error_m2_Lass$lambda.1se,
-  standardize = TRUE
-)
-
-# Coeficientes del modelo
-# ==============================================================================
-df_coeficientes_mod2lass <- coef(modelo2_Lasso) %>%
-  as.matrix() %>%
-  as_tibble(rownames = "predictor") %>%
-  rename(coeficiente = s0)
-
-df_coeficientes_mod2lass %>%
-  filter(predictor != "(Intercept)") %>%
-  ggplot(aes(x = predictor, y = coeficiente)) +
-  geom_col() +
-  labs(title = "Coeficientes del modelo 2 Lasso") +
-  theme_bw() +
-  theme(axis.text.x = element_text(size = 6, angle = 45))
-
-df_coefic_mod2_Lass %>%
-  filter(
-    predictor != "(Intercept)",
-    coeficiente != 0
-  ) 
-
-
-# Predicciones de entrenamiento modelo 2
-
-predicciones_train_mod2_Lass <- predict(modelo2_Lasso, newx = x_subtrain_H)
-
-# MSE de entrenamiento modelo 2
-
-training_mse_mod2_Lass <- mean((predicciones_train_mod2_Lass - y_subtrain_H)^2)
-print(paste("Error (mse) de entrenamiento:", training_mse_mod2_Lass ))
-
-predicciones_test_mod2_Lass <- predict(modelo2_Lasso, newx = x_subtest_H)
-
-# MSE de test modelo 2
-
-test_mse_mod2_lasso <- mean((predicciones_test_mod2_Lass - y_subtest_H)^2)
-print(paste("Error (mse) de test:", test_mse_mod2_lasso))
-
-
 
