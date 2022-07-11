@@ -332,7 +332,7 @@ logit_lasso_smote<- train(
 
 testResults <- data.frame(Pobre = Testing_H$Pobre_dummy)
 testResults$logit<- predict(logit_caret_modg,
-                            newdata = Testing_H,
+                            newdata = Testing_H, 
                             type = "prob")[,1]
 testResults$lasso<- predict(logit_lasso_roc,
                             newdata = Testing_H,
@@ -1559,12 +1559,9 @@ DTEST_PR$P6210[is.na(DTEST_PR$P6210)] = 9
 Edad <- DTRAIN_PR$P6040
 Sexo <- DTRAIN_PR$P6020
 Educ <- DTRAIN_PR$P6210
-Edad2 <- (DTRAIN_PR$Edad)^2 
 View(DTRAIN_PR)
-DTRAIN_PR <- cbind(DTRAIN_PR, Edad)
-DTRAIN_PR <- cbind(DTRAIN_PR, Edad2)
-DTRAIN_PR <- cbind(DTRAIN_PR, Sexo, Educ)
-
+DTRAIN_PR <- cbind(DTRAIN_PR, Sexo, Educ, Edad)
+DTRAIN_PR <- DTRAIN_PR%>% mutate(Edad2=Edad^2)
 View(DTRAIN_PR)
 DTRAIN_PR <- DTRAIN_PR %>% #Se vuelven categóricas las variables que así lo sean en la BD
   mutate_at(.vars = c(
@@ -1573,10 +1570,8 @@ DTRAIN_PR <- DTRAIN_PR %>% #Se vuelven categóricas las variables que así lo se
 SexoT <- DTEST_PR$P6020
 EdadT<- DTEST_PR$P6040
 EducT <- DTEST_PR$P6210
-Edad2T <- (DTEST_PR$EdadT)^2
-
-
-DTEST_PR <- cbind(DTEST_PR, EdadT, SexoT, EducT, Edad2T)
+DTEST_PR <- cbind(DTEST_PR, EdadT, SexoT, EducT)
+DTEST_PR <- DTEST_PR%>% mutate(Edad2T=EdadT^2)
 View(DTEST_PR)
 DTEST_PR <- DTEST_PR %>% #Se vuelven categóricas las variables que así lo sean en la BD
   mutate_at(.vars = c(
@@ -1636,9 +1631,6 @@ y_subtrain_P <- datos_subtrain_P$Ingtot
 
 x_subtest_P <- model.matrix(Ingtot~ Edad + Edad2 + Sexo + factor(Educ) + factor (Oficio) + factor (Dominio), data = datos_subtrain_P)[, -1]
 y_subtest_P <- datos_subtrain_P$Ingtot
-
-
-
 #Se obtiene ajuste con regularización Ridge para el modelo 1
 modelobase1Ri <- glmnet(
   x           = x_subtrain_P,
@@ -1808,7 +1800,7 @@ df_coeficientes_mod1lass %>%
     predictor != "(Intercept)",
     coeficiente != 0
   ) 
-
+View( df_coeficientes_mod1lass)
 
 # Predicciones de entrenamiento modelo 1
 
@@ -1828,4 +1820,11 @@ print(paste("Error (mse) de test:", test_mse_mod1_lasso))
 
 
 # ==============================================================================
+#Se conforma la base de datos con los resultados del RMSE
+RMSE_modelos<-c(test_mse_mod1_lasso, RMSE_modellll2, RMSE_modellll3, RMSE_modellll4,RMSE_modellll5,RMSE_modellll6,RMSE_modellll7, RMSE_modellll8, RMSE_modellll9)
+x_label<-c('modelo1','modelo 2', 'modelo3', 'modelo 4', 'modelo5','modelo6','modelo7','modelo8', 'modelo9')
+RMSE_<-data.frame(x_label,RMSE_modelos)
 
+#Se grafica el resultado
+ggplot(data=RMSE_, aes(x = x_label, y = RMSE_modelos, group=1)) + 
+  geom_line()+   geom_point()
