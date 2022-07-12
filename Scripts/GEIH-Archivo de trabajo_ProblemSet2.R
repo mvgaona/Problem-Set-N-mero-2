@@ -798,7 +798,6 @@ Eval_ResultadosMod4$Roc <- predict(logit_lasso_rocMod4,
                                    newdata = Evaluation_H_Mod4,
                                    type = "prob")[,1]
 
-install.packages("pROC")
 library(pROC)
 #Se calcula el ROC para la regresión
 rf_ROCMod4 <- roc(Eval_ResultadosMod4$Pobre, Eval_ResultadosMod4$Roc, levels = rev(levels(Eval_ResultadosMod4$Pobre)))
@@ -890,7 +889,7 @@ testResultsMod4<-testResultsMod4 %>%
          lassom4=ifelse(lassom4>0.5,"Si","No"),
          lasso_threshm4=ifelse(lasso_threshm4>rf_ThreshMod4$threshold,"Si","No"),
          lasso_upsamplem4=ifelse(lasso_upsamplem4>rf_ThreshMod4$threshold,"Si","No"),
-         mylogit_lasso_downsamplem4=ifelse(mylogit_lasso_downsamplem4>0.5,"Si","No")) 
+         mylogit_lasso_downsamplem4=ifelse(mylogit_lasso_downsamplem4>rf_ThreshMod4$threshold,"Si","No")) 
 
 
 with(testResultsMod4,table(Pobre,logitm4))
@@ -899,22 +898,21 @@ with(testResultsMod4,table(Pobre,lasso_threshm4))
 with(testResultsMod4,table(Pobre,lasso_upsamplem4))
 with(testResultsMod4,table(Pobre,mylogit_lasso_downsamplem4))
 
+View(logit_lasso_upsampleMod4[["results"]]) 
+View(logit_lasso_downsampleMod4[["results"]]) 
 Mod_log_4 <- stats::glm(model4,family=binomial(link = "logit"), data= DaTRAIN_H)
 #Predicción
 ###Prediccion
 model4
 DaTRAIN_H$PredMod_Log_4 <- stats::predict.glm(Mod_log_4 , newdata= DaTRAIN_H, type="response")
 summary(DaTRAIN_H$PredMod_Log_4)
-rule4 = mean(DaTRAIN_H$PredMod_Log_4) 
 ClasPredMod_Log_4 <- ifelse(DaTRAIN_H$PredMod_Log_4>rf_ThreshMod4$threshold,1,0)
 summary(ClasPredMod_Log_4) 
-matrix(logit_lasso_upsampleMod4)
-logit_lasso_upsampleMod4
-cm_log4 =  confusionMatrix(data= factor(logit_lasso_upsampleMod4) , 
+cm_log4 =  confusionMatrix(data= factor(ClasPredMod_Log_4), 
                           reference= factor(DaTRAIN_H$Pobre) , 
                           mode="sens_spec" , positive="1")
 cm_log4
-#Modelo5
+
 model5 <- as.formula("Pobre ~ P5000 + OcVivl")
 require(caret)
 set.seed(10101)
@@ -1062,10 +1060,6 @@ logit_lasso_downsampleMod5 <- train(
 
 logit_lasso_downsampleMod5
 
-#SMOTE resampling
-install.packages("smotefamily")
-library(smotefamily)
-require("smotefamily")
 predictorsMod5<-c(" P5000 + OcVivl ") 
 model5
 head(DaTRAIN_H_mini_Mod5[predictorsMod5])
@@ -1088,9 +1082,9 @@ testResultsMod5$mylogit_lasso_downsamplem5<- predict(logit_lasso_downsampleMod5,
 testResultsMod5<-testResultsMod5 %>%
   mutate(logitm5=ifelse(logitm5>0.5,"Si","No"),
          lassom5=ifelse(lassom5>0.5,"Si","No"),
-         lasso_threshm5=ifelse(lasso_threshm5>rf_ThreshMod4$threshold,"Si","No"),
-         lasso_upsamplem5=ifelse(lasso_upsamplem5>0.5,"Si","No"),
-         mylogit_lasso_downsamplem5=ifelse(mylogit_lasso_downsamplem5>0.5,"Si","No")#,
+         lasso_threshm5=ifelse(lasso_threshm5>rf_ThreshMod5$threshold,"Si","No"),
+         lasso_upsamplem5=ifelse(lasso_upsamplem5>rf_ThreshMod5$threshold,"Si","No"),
+         mylogit_lasso_downsamplem5=ifelse(mylogit_lasso_downsamplem5>rf_ThreshMod5$threshold,"Si","No")
   )
 
 with(testResultsMod5,table(Pobre,logitm5))
@@ -1100,14 +1094,14 @@ with(testResultsMod5,table(Pobre,lasso_upsamplem5))
 with(testResultsMod5,table(Pobre,mylogit_lasso_downsamplem5))
 Mod_log_5 <- stats::glm(model5,family=binomial(link = "logit"), data= DaTRAIN_H)
 tidy(Mod_log_5)
+View(logit_lasso_upsampleMod5[["results"]]) 
 #Predicción
 ###Prediccion
 DaTRAIN_H$PredMod_Log_5 <- stats::predict.glm(Mod_log_5 , newdata= DaTRAIN_H, type="response")
 summary(DaTRAIN_H$PredMod_Log_5)
 head(DaTRAIN_H$PredMod_Log_5)
 head(DaTRAIN_H$Pobre)
-rule5 = mean(DaTRAIN_H$PredMod_Log_5) 
-ClasPredMod_Log_5 <- ifelse(DaTRAIN_H$PredMod_Log_5>rule4,1,0)
+ClasPredMod_Log_5 <- ifelse(DaTRAIN_H$PredMod_Log_5>rf_ThreshMod5$threshold,1,0)
 summary(ClasPredMod_Log_5) 
 cm_log5 = confusionMatrix(data= factor(ClasPredMod_Log_5) , 
                           reference= factor(DaTRAIN_H$Pobre) , 
