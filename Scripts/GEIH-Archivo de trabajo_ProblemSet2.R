@@ -912,7 +912,7 @@ cm_log4 =  confusionMatrix(data= factor(ClasPredMod_Log_4),
                           reference= factor(DaTRAIN_H$Pobre) , 
                           mode="sens_spec" , positive="1")
 cm_log4
-
+#MODEL 5
 model5 <- as.formula("Pobre ~ P5000 + OcVivl")
 require(caret)
 set.seed(10101)
@@ -1120,14 +1120,18 @@ testResultsModFinal<- predict(logit_lasso_upsampleMod4,
                               newdata = DaTEST_H,
                               type = "prob")[,1]
 
-TestResulstFinal<- ifelse(testResultsModFinal>rf_ThreshMod4$threshold,"Si","No")
-#TestResulstFinal<- ifelse(testResultsModFinal>rf_ThreshMod4$threshold,"1","0")
+TestResulstFinal_1<- ifelse(testResultsModFinal>rf_ThreshMod4$threshold,"Si","No")
+TestResulstFinal<- ifelse(testResultsModFinal>rf_ThreshMod4$threshold,"1","0")
 View(TestResulstFinal)
-table(TestResulstFinal)
-TestResultsFinal
-TestResulstFinal_1 <- cbind(DaTEST_H$id , TestResulstFinal)
- 
+stargazer(TestResulstFinal_1)
 
+
+TestResulstFinal_1 <- cbind(DaTEST_H$id , TestResulstFinal)
+TestResultsMod1Tabla<- table(TestResulstFinal_1)
+  View(TestResulstFinal_1)
+write.csv (TestResulstFinal_1, "../Elementos_Guardados/predictions_beleno_gaona_c3_r116.csv")
+write.csv(TestResulstFinal, "../Elementos_Guardados/predictionsmod_beleno_gaona_c3_r116.csv")
+write.csv(TestResultsMod1Tabla, "../Elementos_Guardados/predictionsTabla_beleno_gaona_c3_r116.csv")
 
 
 
