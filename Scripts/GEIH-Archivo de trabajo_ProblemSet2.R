@@ -1366,7 +1366,8 @@ testResultsModFinal<- predict(logit_lasso_upsampleMod4,
 TestResulstFinal<- ifelse(testResultsModFinal>rf_ThreshMod4$threshold,"Si","No")
 View(TestResulstFinal)
 table(TestResulstFinal)
-write.csv (TestResulstFinal, "HPobresClasif.csv",  row.names = FALSE) 
+TestResulstFinal <- cbind(DaTEST_H$id , TestResulstFinal)
+write.csv (TestResulstFinal, "HPobresClasificación.csv",  row.names = FALSE) 
 ##Modelo de regresión 
 
 
