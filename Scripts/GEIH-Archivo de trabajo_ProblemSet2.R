@@ -1367,7 +1367,7 @@ TestResulstFinal<- ifelse(testResultsModFinal>rf_ThreshMod4$threshold,"Si","No")
 View(TestResulstFinal)
 table(TestResulstFinal)
 TestResulstFinal <- cbind(DaTEST_H$id , TestResulstFinal)
-write.csv (TestResulstFinal, "HPobresClasificación.csv",  row.names = FALSE) 
+write.csv (TestResulstFinal, "HPobresClasificación.csv") 
 ##Modelo de regresión 
 
 
