@@ -33,15 +33,8 @@ p_load(caret,
 rm(list = ls()) #Limpia las variables que existan al momento de correr el código
 ###Base de datos Problem set 2
 library(readr)
-#Datos_test_hogares<-read.csv("../Elementos_Guardados/test_hogares.csv") #Guardar las bases de datos
-#Datos_test_personas<-read.csv("../Elementos_Guardados/test_personas.csv") #Guardar las bases de datos
-#Datos_training_hogares<-read.csv("../Elementos_Guardados/train_hogares.csv") #Guardar las bases de datos
-#Datos_training_personas<-read.csv(unzip("../Elementos_Guardados/train_personas.zip","train_personas.csv"))#Se extrae del .zip, teniendo en cuenta que es un archivo muy grande para subir a Github
-#file.remove('train_personas.csv')#"Por si se requiere borrar algún archivo
-
 #Se debe poner el directorio de donde está el script:
 #Session-> Set Working directory -> To source file location, para lo cual se debe descargar el repositorioDatos_test_hogares<-readRDS("../Elementos_Guardados/test_hogares.rds") #Guardar las bases de datos
-#setwd("C:/Users/valer/Desktop/Andes/Intersemestral/Big Data/Problem Set 2/Problem-Set-2/Scripts")
 DTEST_P<-data.frame(readRDS("../Elementos_Guardados/test_personas.rds"))  #Guardar las bases de datos
 DTEST_H <- data.frame(readRDS("../Elementos_Guardados/test_hogares.rds"))
 DTRAIN_H<-data.frame(readRDS("../Elementos_Guardados/train_hogares.rds")) #Guardar las bases de datos
@@ -166,14 +159,6 @@ set.seed(10101)
 Split_2<- createDataPartition(other_$Pobre, p = 1/3) [[1]]
 Evaluation_H <- other_[ Split_2,] #Base evaluacion para ROC
 Testing_H <- other_[-Split_2,] #Base mini test
-
-#--------------------------------------------------------------------------------------------------------------------------------------
-#-------------------------------------------------------------------------------------------------------------------------------------
-#Recomiendo usar estas mismas bases para todos los modelos, para tener una referencia de cómo comparar! Las bases no deben cambiar tanto
-#--------------------------------------------------------------------------------------------------------------------------------------
-#-------------------------------------------------------------------------------------------------------------------------------------
-
-
 #Se comprueba la proporción de la variable  "Pobre" en la base de datos
 prop.table(table(DaTRAIN_H_mini$Pobre_dummy)) #Para la base mini train
 prop.table(table(Evaluation_H$Pobre_dummy)) 
@@ -1074,7 +1059,7 @@ logit_lasso_upsampleMod4 <- train(
   tuneGrid = expand.grid(alpha = 0,lambda=lambdasMod4),
   preProcess = c("center", "scale")
 )
-View(logit_lasso_upsampleMod4)
+logit_lasso_upsampleMod4
 
 #Down-sampling
 set.seed(10101)
@@ -1099,10 +1084,6 @@ logit_lasso_downsampleMod4 <- train(
 
 logit_lasso_downsampleMod4
 
-#SMOTE resampling
-install.packages("smotefamily")
-library(smotefamily)
-require("smotefamily")
 predictorsMod4<-c(" P5000 + OcVivl + Dominio") 
 
 head(DaTRAIN_H_mini_Mod4[predictorsMod4])
@@ -1144,9 +1125,11 @@ model4
 DaTRAIN_H$PredMod_Log_4 <- stats::predict.glm(Mod_log_4 , newdata= DaTRAIN_H, type="response")
 summary(DaTRAIN_H$PredMod_Log_4)
 rule4 = mean(DaTRAIN_H$PredMod_Log_4) 
-ClasPredMod_Log_4 <- ifelse(DaTRAIN_H$PredMod_Log_4>rule4,1,0)
+ClasPredMod_Log_4 <- ifelse(DaTRAIN_H$PredMod_Log_4>rf_ThreshMod4$threshold,1,0)
 summary(ClasPredMod_Log_4) 
-cm_log4 = confusionMatrix(data= factor(logit_lasso_upsampleMod4) , 
+matrix(logit_lasso_upsampleMod4)
+logit_lasso_upsampleMod4
+cm_log4 =  confusionMatrix(data= factor(logit_lasso_upsampleMod4) , 
                           reference= factor(DaTRAIN_H$Pobre) , 
                           mode="sens_spec" , positive="1")
 cm_log4
