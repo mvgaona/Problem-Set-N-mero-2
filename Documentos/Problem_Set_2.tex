@@ -78,12 +78,78 @@ relative importance in the prediction.
 
 
 \subsection{Modelo del ingreso}
+A continuación se describirá el proceso general para obtener el mejor modelo de regresión para realizar la predicción de pobreza utilizando este enfoque:
+
+
+
+
+Se realizó el análisis de las variables en la base test para verificar que las variables contenidas en esta, estuvieran presentes en la de train para realizar la regresión con toda la información necesaria. Se llegó a la conclusión que para realizar esta regresión, se haría sobre la base de test de personas, obteniendo el ingreso por persona y realizar la sumatoria de los ingresos por cada persona del hogar y así tener el ingreso por hogar. Si bien este ingreso por hogar, se puede aproximar a la variable: \textit{Ingpcug}, mientras que la medición de pobreza se realiza con la variable \textit{Ingtotugarr}, para este ejemplo y considerando las siguientes estadísticas descriptivas para estas dos variables en la base de test, que se muestra en el Cuadro ~\ref{tab_1} :
+
+\begin{table}[htbp]
+\caption{Estadística descriptiva variables Ingpcug e Ingtotugarr}
+\begin{center}
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Tabla}&\multicolumn{2}{|c|}{\textbf{Variables}} \\
+\cline{2-3} 
+\textbf{Estadístico} & \textbf{\textit{Ingpcug}}& \textbf{\textit{Ingtotugarr}} \\
+\hline
+Media& \$2.089.017&\$2.305.640\\
+\hline
+\end{tabular}
+\label{tab_1}
+\end{center}
+\end{table}
+
+Debido a que la diferencia del promedio entre un valor y otro es cercano al 10\% y considerando los posibles errores presentados en la predicción, obtenida a partir de la regresión, para calcular la pobreza a partir del ingreso se asumirá que: $Ingpcug\approx Ingtotugarr$.\\
+
+Ahora bien, las variables escogidas para la regresión que se consideraron relevantes para el modelo, utilizando las teorías clásicas económicas, son las siguientes:
+
+\begin{itemize}
+\item Sexo
+\item Edad y su componente cuadrática
+\item Educación, representado en el nivel educativo más alto alcanzado por la persona
+\item Ocupado: variable creada a partir de la variable \textit{Oficio}, para la cual, se tiene \textit{1} cuando existe el oficio y \textit{0} cuando no lo tiene. Se imputó el valor de cero en las bases de datos para los datos NA.
+\item Dominio: Se consideró esta variable teniendo en cuenta que la línea de pobreza varía según la ciudad, por lo cual, se consideró relevante en el modelo.
+\end{itemize}
+
+Las anteriores variables, resultan en el siguiente modelo:\\
+\begin{multline*}
+Ingtot= \beta_{0}+\beta_{1}Edad+\beta_{2}Edad^{2}+\beta_{3}Sexo+\\
+\beta_{4}Educacion+\beta_{5}Ocupado+\beta_{6}Dominio+u 
+\end{multline*}
+
+En primera instancia, se dividió la base de train de personas en un subtrain y subtest para mirar el ajuste del modelo y no tener overfitting, teniendo en cuenta que no se cuenta con la variable dependiente en el test para realizar una métrica más certera del modelo. Se realizó como primer modelo la regresión OLS, luego se realizaron varios modelos y la regularización con Ridge y Lasso para el modelo presentado en la ecuación anterior, así como pruebas de diferentes modelos con diferentes variables, que se presentan en las ecuaciones \eqref{eq:2}, \eqref{eq:3} y \eqref{eq:4}.
+
+
+\begin{equation}
+Ingtot= \beta_{0}+\beta_{1}Edad+\beta_{2}Edad^{2}+\beta_{3}Sexo+\\
+\beta_{4}Educacion+u \label{eq:2}
+\end{equation}
+
+\begin{equation}
+Ingtot= \beta_{0}+\beta_{1}Edad+\beta_{2}Edad^{2}+\beta_{3}Sexo+\\
+\beta_{4}Educacion+\beta_{5}Ocupado+u \label{eq:3}
+\end{equation}
+\begin{equation}
+Ingtot= \beta_{0}+\beta_{1}Edad+\beta_{2}Edad^{2}+\beta_{3}Sexo\label{eq:4}
+\end{equation}
+
+Para cada modelo con la base de train completa, mostrado en los modelos \eqref{eq:2}, \eqref{eq:3} y \eqref{eq:4}, se realizaron los modelos de Ridge y Lasso, se obtuvo el MSE de las predicciones sobre training y se realizó la gráfica que compara los modelos. Esta gráfica se encuentra en la Figura ~\ref{fig1}.  
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=0.4\textwidth]{../Vistas/MSE_base_training.png}}
+\caption{Comparación MSE diferentes modelos base train personas}
+\label{fig1}
+\end{figure}
+
+De dicha comparación, se obtiene que el modelo OLS (modelo 1) es el de menor MSE, por lo cual, es el que se escoge para realizar la regresión del Ingreso total por persona. No se reescaló el Ingreso (por ejemplo, con logaritmo), debido a que se busca obtener el valor y no una interpretación de este.\\
+Para este modelo de regresión, el mejor modelo no fue obtenido por ningún hiperparámetro ni por ningún método de regularización, se escogió el de menor MSE, también porque en pruebas aleatorias, el parámetro Sensitivity fue mayor para este modelo OLS que para los obenidos de regularización.\\
+
+Finalmente, la tabla de falsos positivos y negativos para el mejor modelo se presenta en la Figura ~\ref{fig2}, en donde para la predicción en el training se obtuvo un $Accuracy=$, y $Sensitivity=$.
 
 
 \begin{itemize}
-\item A detailed explanation of the final chosen model. The explanation must
-include how the model was trained, hyper-parameters selection, and other
-relevant information.
 \item Include comparisons to at least 5 other models. Compare them in terms of
 MSE.
 \item Convert the predicted income to a binary indicator and show the performance in terms of the ROC, AUC, False Positives, or False Negatives.
