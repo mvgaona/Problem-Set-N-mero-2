@@ -3,7 +3,6 @@
 
 #### PROBLEM SET 2 #####
 
-
 install.packages("pacman") #Instalar librería si no cuenta con esta 
 library(pacman) #Llamar librería
 #Se cargan las librerías a usar en el presente Problem Set
@@ -1162,9 +1161,9 @@ porcentaje_naPR <- cantidad_naPR/nrow(DTRAIN_PR)
 porcentaje_naPR <-porcentaje_naPR*100
 porcentaje_naPR 
 
-DTRAIN_PR$Oficio[is.na(DTRAIN_PR$Oficio)] = 0 
-DTRAIN_PR$P6210[is.na(DTRAIN_PR$P6210)] = 9 
-DTRAIN_PR$Ingtot[is.na(DTRAIN_PR$Ingtot)] = 0 
+DTRAIN_PR$Oficio[is.na(DTRAIN_PR$Oficio)] = 0 #Se imputa 0a los NA, esta clasificación es que no tienen oficio
+DTRAIN_PR$P6210[is.na(DTRAIN_PR$P6210)] = 9 #Se imputa 9 a los NA, para determinar que no es claro el nivel educativo
+DTRAIN_PR$Ingtot[is.na(DTRAIN_PR$Ingtot)] = 0 #Se imputa 0 a los NA, que no reciben ingresos
 
 cantidad_naPRT <- sapply(DTEST_PR, function(x) sum(is.na(x)))
 cantidad_naPRT <- data.frame(cantidad_naPRT)
@@ -1172,8 +1171,8 @@ porcentaje_naPRT <- cantidad_naPRT/nrow(DTEST_PR)
 porcentaje_naPRT <-porcentaje_naPRT*100
 porcentaje_naPRT 
 
-DTEST_PR$Oficio[is.na(DTEST_PR$Oficio)] = 0 
-DTEST_PR$P6210[is.na(DTEST_PR$P6210)] = 9 
+DTEST_PR$Oficio[is.na(DTEST_PR$Oficio)] = 0 #Se imputa 0a los NA, esta clasificación es que no tienen oficio
+DTEST_PR$P6210[is.na(DTEST_PR$P6210)] = 9 #Se imputa 9 a los NA, para determinar que no es claro el nivel educativo
 
 
 #Descripción
@@ -1191,6 +1190,30 @@ DTRAIN_PR <- DTRAIN_PR %>% #Se vuelven categóricas las variables que así lo se
   mutate_at(.vars = c(
     "Sexo", "Educ", "Dominio", "Oficio", "Ocup"),
     .funs = factor)                                                                   
+
+#Descripción de las variables a usar en el modelo del train
+min(Edad)
+max(Edad)
+mean(Edad)
+
+class(Sexo)
+levels(Sexo)
+summary(Sexo)
+table(Sexo)
+
+class(Educ)
+levels(Educ)
+summary(Educ)
+table(Educ)
+
+modeEduc <- function(Npersug){
+  return(as.numeric(names(which.max(table(Npersug)))))
+}
+modeEduc(Educ)
+
+
+
+
 rm(Sexo, Edad, Educ) #Se borran para no generar duplicación de valores, en caso tal
 Sexo <- DTEST_PR$P6020
 Edad<- DTEST_PR$P6040
@@ -1207,599 +1230,32 @@ DTEST_PR <- DTEST_PR %>% #Se vuelven categóricas las variables que así lo sean
     "Sexo", "Educ", "Dominio", "Oficio", "Ocup"),
     .funs = factor)
 
+#Descripción de las variables a usar en el modelo del test
+min(Edad)
+max(Edad)
+mean(Edad)
+
+class(Sexo)
+levels(Sexo)
+summary(Sexo)
+table(Sexo)
+
+class(Educ)
+levels(Educ)
+summary(Educ)
+table(Educ)
+
+modeEduc <- function(Npersug){
+  return(as.numeric(names(which.max(table(Npersug)))))
+}
+modeEduc(Educ)
+
+
 #Análisis de Ingtotugarr e Ingotupcg
 
 summary(DTRAIN_H$Ingtotugarr)
 summary(DTRAIN_H$Ingtotug)
 
-
-#Se hará el análisis de las variables subdividiendo la base train en test y train para validar si a través de este enfoque se logra una mejor predicción
-#evitando el Overfitting al realizar la predicción sobre toda la base train.
-
-set.seed(10101)
-id_train_subset_H <- sample(1:nrow(DTRAIN_HR), size = 0.7*nrow(DTRAIN_HR), replace = FALSE)
-id_train_subset_P <- sample(1:nrow(DTRAIN_PR), size = 0.7*nrow(DTRAIN_PR), replace = FALSE)
-
-datos_subtrain_H <- DTRAIN_HR[id_train_subset_H, ]
-datos_subtest_H  <- DTRAIN_HR[-id_train_subset_H, ]
-
-datos_subtrain_P <- DTRAIN_PR[id_train_subset_P, ]
-datos_subtest_P  <- DTRAIN_PR[-id_train_subset_P, ]
-
-
-# ==============================================================================
-# Modelo 1 base -OLS 
-#Se hará regresión con respecto al Ingtot por cada persona de la unidad de gasto
-model_base_1 <- lm(Ingtot ~ Edad + Edad2 + factor(Sexo) + factor(Educ) + factor (Oficio) + factor (Dominio), data = datos_subtrain_P)
-#model_base_1 <- lm(Ingtot ~ Edad + Edad2 + factor(Sexo) + factor(Educ) + factor (Ocup) + factor (Dominio), data = datos_subtrain_P)
-summary(model_base_1)
-
-#Se visualizan los coeficientes de OLS para el modelo 1 (OLS)
-stargazer(model_base_1,type = "text")
-modelb1_coeficientes <- model_base_1$coefficients %>%
-  enframe(name = "predictor", value = "coeficiente")
-
-modelb1_coeficientes %>%
-  filter(predictor != "(Intercept)") %>%
-  ggplot(aes(x = predictor, y = coeficiente)) +
-  geom_col() +
-  labs(title = "Coeficientes del modelo OLS para modelo 1") +
-  theme_bw() +
-  theme(axis.text.x = element_text(size = 5, angle = 45))
-
-
-
-# Predicciones de entrenamiento para modelo 1
-
-predicciones_train_mb1 <- predict(model_base_1, newdata = datos_subtrain_P)
-
-# MSE de entrenamiento para modelo 1
-
-training_mse_mb1 <- mean((predicciones_train_mb1 - datos_subtrain_P$Ingtot)^2)
-paste("Error (mse) de entrenamiento modelo 1:", training_mse_mb1)
-
-
-# Predicciones de test modelo 1
-
-predicciones_test_mb1 <- predict(model_base_1, newdata = datos_subtest_P)
-
-# MSE de test modelo 1
-
-test_mse_ols_mb1 <- mean((predicciones_test_mb1 - datos_subtest_P$Ingtot)^2)
-paste("Error (mse) de test modelo 1:", test_mse_ols_mb1)
-
-# ==============================================================================
-#Para el modelo 1 (modelo 2 con Ridge)
-x_subtrain_P <- model.matrix(~ Edad + Edad2 + factor(Sexo) + factor(Educ) + factor (Oficio) + factor (Dominio), data = datos_subtrain_P)[, -1]
-#x_subtrain_P <- model.matrix(~ Edad + Edad2 + factor(Sexo) + factor(Educ) + factor (Ocup) + factor (Dominio), data = datos_subtrain_P)[, -1]
-y_subtrain_P <- datos_subtrain_P$Ingtot
-
-x_subtest_P <- model.matrix(~ Edad + Edad2 + factor(Sexo) + factor(Educ) + factor (Oficio) + factor (Dominio), data = datos_subtest_P)[, -1]
-#x_subtest_P <- model.matrix(~ Edad + Edad2 + factor(Sexo) + factor(Educ) + factor (Ocup) + factor (Dominio), data = datos_subtest_P)[, -1]
-y_subtest_P <- datos_subtest_P$Ingtot
-
-#Se obtiene ajuste con regularización Ridge para el modelo 1
-
-modelobase1Ri <- glmnet(
-  x           = x_subtrain_P,
-  y           = y_subtrain_P,
-  alpha       = 0,
-  nlambda     = 200,
-  standardize = TRUE
-)
-
-regularizacion_mb1 <- modelobase1Ri$beta %>% 
-  as.matrix() %>%
-  t() %>% 
-  as_tibble() %>%
-  mutate(lambda = modelobase1Ri$lambda)
-
-regularizacion_mb1 <- regularizacion_mb1 %>%
-  pivot_longer(
-    cols = !lambda, 
-    names_to = "predictor",
-    values_to = "coeficientes"
-  )
-
-regularizacion_mb1 %>%
-  ggplot(aes(x = lambda, y = coeficientes, color = predictor)) +
-  geom_line() +
-  scale_x_log10(
-    breaks = trans_breaks("log10", function(x) 10^x),
-    labels = trans_format("log10", math_format(10^.x))
-  ) +
-  labs(title = "Coeficientes del modelo 2 en función de la regularización") +
-  theme_bw() +
-  theme(legend.position = "none")
-
-set.seed(10101)
-cv_errormod1Ri <- cv.glmnet(
-  x           = x_subtrain_P,
-  y           = y_subtrain_P,
-  alpha  = 0,
-  nfolds = 10,
-  type.measure = "mse",
-  standardize  = TRUE
-)
-
-plot(cv_errormod1Ri)
-paste("Mejor valor de lambda encontrado para modelo 1:", cv_errormod1Ri$lambda.min)
-# Mayor valor de lambda con el que el test-error no se aleja más de 1sd del mínimo.
-paste("Mejor valor de lambda encontrado + 1 desviación estándar para modelo 1:", cv_errormod1Ri$lambda.1se)
-
-modelo_1_Ridge <- glmnet(
-  x           = x_subtrain_P,
-  y           = y_subtrain_P,
-  alpha       = 0,
-  lambda      = cv_errormod1Ri$lambda.1se,
-  standardize = TRUE
-)
-
-# Coeficientes del modelo
-
-df_coeficientes_mod1_Ri <- coef(modelo_1_Ridge) %>%
-  as.matrix() %>%
-  as_tibble(rownames = "predictor") %>%
-  rename(coeficiente = s0)
-
-df_coeficientes_mod1_Ri %>%
-  filter(predictor != "(Intercept)") %>%
-  ggplot(aes(x = predictor, y = coeficiente)) +
-  geom_col() +
-  labs(title = "Coeficientes del modelo Ridge") +
-  theme_bw() +
-  theme(axis.text.x = element_text(size = 6, angle = 45))
-
-#Predicciones de entrenamiento
-
-predicciones_train_mb1ri <- predict(modelo_1_Ridge, newx = x_subtrain_P)
-
-# MSE de entrenamiento
-
-training_mse_mb1ri <- mean((predicciones_train_mb1ri - y_subtrain_P)^2)
-paste("Error (mse) de entrenamiento modelo 2:", training_mse_mb1ri)
-
-#Predicción
-predicciones_test_mb1ri <- predict(modelo_1_Ridge, newx = x_subtest_P)
-
-# MSE de test
-
-test_mse_mod1ridge <- mean((predicciones_test_mb1ri - y_subtest_P)^2)
-paste("Error (mse) de test modelo 2:", test_mse_mod1ridge)
-
-
-# ==============================================================================
-#Para el modelo 1 Lasso (modelo 3)
-
-modelobase1lass <- glmnet(
-  x           = x_subtrain_P,
-  y           = y_subtrain_P,
-  alpha       = 1,
-  nlambda     = 200,
-  standardize = TRUE
-)
-
-regularizacionmb1lass <- modelobase1lass$beta %>% 
-  as.matrix() %>%
-  t() %>% 
-  as_tibble() %>%
-  mutate(lambda1 = modelobase1lass$lambda)
-
-regularizacionmb1lass <- regularizacionmb1lass %>%
-  pivot_longer(
-    cols = !lambda1, 
-    names_to = "predictor",
-    values_to = "coeficientes"
-  )
-
-regularizacionmb1lass %>%
-  ggplot(aes(x = lambda1, y = coeficientes, color = predictor)) +
-  geom_line() +
-  scale_x_log10(
-    breaks = trans_breaks("log10", function(x) 10^x),
-    labels = trans_format("log10", math_format(10^.x))
-  ) +
-  labs(title = "Coeficientes del modelo 3 en función de la regularización") +
-  theme_bw() +
-  theme(legend.position = "none")
-
-# Evolución del error en función de lambda
-
-set.seed(10101)
-cv_error_m1_Lass <- cv.glmnet(
-  x      = x_subtrain_P,
-  y      = y_subtrain_P,
-  alpha  = 1,
-  nfolds = 10,
-  type.measure = "mse",
-  standardize  = TRUE
-)
-
-plot(cv_error_m1_Lass)
-
-paste("Mejor valor de lambda encontrado para modelo 3:", cv_error_m1_Lass$lambda.min)
-paste("Mejor valor de lambda encontrado + 1 desviación estándar para modelo 1:", cv_error_m1_Lass$lambda.1se)
-
-# Mejor modelo lambda óptimo + 1sd
-
-modelo1_Lasso <- glmnet(
-  x           = x_subtrain_P,
-  y           = y_subtrain_P,
-  alpha       = 1,
-  lambda      = cv_error_m1_Lass$lambda.1se,
-  standardize = TRUE
-)
-
-# Coeficientes del modelo
-
-df_coeficientes_mod1lass <- coef(modelo1_Lasso) %>%
-  as.matrix() %>%
-  as_tibble(rownames = "predictor") %>%
-  rename(coeficiente = s0)
-
-df_coeficientes_mod1lass %>%
-  filter(predictor != "(Intercept)") %>%
-  ggplot(aes(x = predictor, y = coeficiente)) +
-  geom_col() +
-  labs(title = "Coeficientes del modelo 3 Lasso") +
-  theme_bw() +
-  theme(axis.text.x = element_text(size = 6, angle = 45))
-
-df_coeficientes_mod1lass %>%
-  filter(
-    predictor != "(Intercept)",
-    coeficiente != 0
-  ) 
-View( df_coeficientes_mod1lass)
-
-# Predicciones de entrenamiento modelo 3
-
-predicciones_train_mod1_Lass <- predict(modelo1_Lasso, newx = x_subtrain_P)
-
-# MSE de entrenamiento modelo 3
-
-training_mse_mod1_Lass <- mean((predicciones_train_mod1_Lass - y_subtrain_P)^2)
-print(paste("Error (mse) de entrenamiento modelo 3:", training_mse_mod1_Lass ))
-
-predicciones_test_mod1_Lass <- predict(modelo1_Lasso, newx = x_subtest_P)
-
-# MSE de test modelo 3
-
-test_mse_mod1_lasso <- mean((predicciones_test_mod1_Lass - y_subtest_P)^2)
-print(paste("Error (mse) de test modelo 3:", test_mse_mod1_lasso))
-
-# ==============================================================================
-#Para el modelo 2 en nomenclatura (modelo 4 a nivel general)
-
-
-x_subtrain_P_mod2 <- model.matrix(Ingtot~ Edad + Edad2 + factor(Sexo) + factor(Educ), data = datos_subtrain_P)[, -1]
-y_subtrain_P_mod2 <- datos_subtrain_P$Ingtot
-
-x_subtest_P_mod2 <- model.matrix(Ingtot~ Edad + Edad2 + factor(Sexo) + factor(Educ) , data = datos_subtest_P)[, -1]
-y_subtest_P_mod2 <- datos_subtest_P$Ingtot
-
-modelobase2lass <- glmnet(
-  x           = x_subtrain_P_mod2,
-  y           = y_subtrain_P_mod2,
-  alpha       = 1,
-  nlambda     = 200,
-  standardize = TRUE
-)
-
-regularizacionmb2lass <- modelobase2lass$beta %>% 
-  as.matrix() %>%
-  t() %>% 
-  as_tibble() %>%
-  mutate(lambda1 = modelobase2lass$lambda)
-
-regularizacionmb2lass <- regularizacionmb2lass %>%
-  pivot_longer(
-    cols = !lambda1, 
-    names_to = "predictor",
-    values_to = "coeficientes"
-  )
-
-regularizacionmb2lass %>%
-  ggplot(aes(x = lambda1, y = coeficientes, color = predictor)) +
-  geom_line() +
-  scale_x_log10(
-    breaks = trans_breaks("log10", function(x) 10^x),
-    labels = trans_format("log10", math_format(10^.x))
-  ) +
-  labs(title = "Coeficientes del modelo 4 en función de la regularización") +
-  theme_bw() +
-  theme(legend.position = "none")
-
-# Evolución del error en función de lambda
-
-set.seed(10101)
-cv_error_m2_Lass <- cv.glmnet(
-  x      = x_subtrain_P_mod2,
-  y      = y_subtrain_P_mod2,
-  alpha  = 1,
-  nfolds = 10,
-  type.measure = "mse",
-  standardize  = TRUE
-)
-
-plot(cv_error_m2_Lass)
-
-paste("Mejor valor de lambda encontrado para modelo 4:", cv_error_m2_Lass$lambda.min)
-paste("Mejor valor de lambda encontrado + 1 desviación estándar para modelo 4:", cv_error_m2_Lass$lambda.1se)
-
-# Mejor modelo lambda óptimo + 1sd
-
-modelo2_Lasso <- glmnet(
-  x           = x_subtrain_P_mod2,
-  y           = y_subtrain_P_mod2,
-  alpha       = 1,
-  lambda      = cv_error_m2_Lass$lambda.1se,
-  standardize = TRUE
-)
-
-# Coeficientes del modelo
-
-df_coeficientes_mod2lass <- coef(modelo2_Lasso) %>%
-  as.matrix() %>%
-  as_tibble(rownames = "predictor") %>%
-  rename(coeficiente = s0)
-
-df_coeficientes_mod2lass %>%
-  filter(predictor != "(Intercept)") %>%
-  ggplot(aes(x = predictor, y = coeficiente)) +
-  geom_col() +
-  labs(title = "Coeficientes del modelo 1 Lasso") +
-  theme_bw() +
-  theme(axis.text.x = element_text(size = 6, angle = 45))
-
-Coeficientes_relevantes_mod2<-df_coeficientes_mod2lass %>%
-  filter(
-    predictor != "(Intercept)",
-    coeficiente != 0
-  ) 
-View( Coeficientes_relevantes_mod2)
-
-# Predicciones de entrenamiento modelo 4
-
-predicciones_train_mod2_Lass <- predict(modelo2_Lasso, newx = x_subtrain_P_mod2)
-
-# MSE de entrenamiento modelo 4
-
-training_mse_mod2_Lass <- mean((predicciones_train_mod2_Lass - y_subtrain_P_mod2)^2)
-print(paste("Error (mse) de entrenamiento modelo 4:", training_mse_mod2_Lass ))
-
-predicciones_test_mod2_Lass <- predict(modelo2_Lasso, newx = x_subtest_P_mod2)
-
-# MSE de test modelo 4
-
-test_mse_mod2_lasso <- mean((predicciones_test_mod2_Lass - y_subtest_P_mod2)^2)
-print(paste("Error (mse) de test modelo 4:", test_mse_mod2_lasso))
-
-# ==============================================================================
-#Para el modelo 3 en nomenclatura (modelo 5 a nivel general)
-
-x_subtrain_P_mod3 <- model.matrix(Ingtot~ Edad + Edad2 + factor(Sexo) + factor(Educ)+factor (Oficio), data = datos_subtrain_P)[, -1]
-#x_subtrain_P_mod3 <- model.matrix(Ingtot~ Edad + Edad2 + factor(Sexo) + factor(Educ)+factor (Ocup), data = datos_subtrain_P)[, -1]
-y_subtrain_P_mod3 <- datos_subtrain_P$Ingtot
-
-x_subtest_P_mod3 <- model.matrix(Ingtot~ Edad + Edad2 + factor(Sexo) + factor(Educ)+factor (Oficio) , data = datos_subtest_P)[, -1]
-#x_subtest_P_mod3 <- model.matrix(Ingtot~ Edad + Edad2 + factor(Sexo) + factor(Educ)+factor (Ocup) , data = datos_subtest_P)[, -1]
-y_subtest_P_mod3 <- datos_subtest_P$Ingtot
-
-modelobase3lass <- glmnet(
-  x           = x_subtrain_P_mod3,
-  y           = y_subtrain_P_mod3,
-  alpha       = 1,
-  nlambda     = 200,
-  standardize = TRUE
-)
-
-
-
-regularizacionmb3lass <- modelobase3lass$beta %>% 
-  as.matrix() %>%
-  t() %>% 
-  as_tibble() %>%
-  mutate(lambda1 = modelobase3lass$lambda)
-
-regularizacionmb3lass <- regularizacionmb3lass %>%
-  pivot_longer(
-    cols = !lambda1, 
-    names_to = "predictor",
-    values_to = "coeficientes"
-  )
-
-regularizacionmb3lass %>%
-  ggplot(aes(x = lambda1, y = coeficientes, color = predictor)) +
-  geom_line() +
-  scale_x_log10(
-    breaks = trans_breaks("log10", function(x) 10^x),
-    labels = trans_format("log10", math_format(10^.x))
-  ) +
-  labs(title = "Coeficientes del modelo 5 en función de la regularización") +
-  theme_bw() +
-  theme(legend.position = "none")
-
-# Evolución del error en función de lambda
-
-set.seed(10101)
-cv_error_m3_Lass <- cv.glmnet(
-  x      = x_subtrain_P_mod3,
-  y      = y_subtrain_P_mod3,
-  alpha  = 1,
-  nfolds = 10,
-  type.measure = "mse",
-  standardize  = TRUE
-)
-
-plot(cv_error_m3_Lass)
-
-paste("Mejor valor de lambda encontrado para modelo 5:", cv_error_m3_Lass$lambda.min)
-paste("Mejor valor de lambda encontrado + 1 desviación estándar para modelo 5:", cv_error_m3_Lass$lambda.1se)
-
-# Mejor modelo lambda óptimo + 1sd
-
-modelo3_Lasso <- glmnet(
-  x           = x_subtrain_P_mod3,
-  y           = y_subtrain_P_mod3,
-  alpha       = 1,
-  lambda      = cv_error_m3_Lass$lambda.1se,
-  standardize = TRUE
-)
-
-# Coeficientes del modelo
-
-df_coeficientes_mod3lass <- coef(modelo3_Lasso) %>%
-  as.matrix() %>%
-  as_tibble(rownames = "predictor") %>%
-  rename(coeficiente = s0)
-
-df_coeficientes_mod3lass %>%
-  filter(predictor != "(Intercept)") %>%
-  ggplot(aes(x = predictor, y = coeficiente)) +
-  geom_col() +
-  labs(title = "Coeficientes del modelo 5 Lasso") +
-  theme_bw() +
-  theme(axis.text.x = element_text(size = 6, angle = 45))
-
-Coeficientes_relevantes_mod3<-df_coeficientes_mod3lass %>%
-  filter(
-    predictor != "(Intercept)",
-    coeficiente != 0
-  ) 
-View( df_coeficientes_mod3lass)
-
-# Predicciones de entrenamiento modelo 5
-
-predicciones_train_mod3_Lass <- predict(modelo3_Lasso, newx = x_subtrain_P_mod3)
-
-# MSE de entrenamiento modelo 5
-
-training_mse_mod3_Lass <- mean((predicciones_train_mod3_Lass - y_subtrain_P_mod3)^2)
-print(paste("Error (mse) de entrenamiento modelo 5:", training_mse_mod3_Lass ))
-
-predicciones_test_mod3_Lass <- predict(modelo3_Lasso, newx = x_subtest_P_mod3)
-
-# MSE de test modelo 5
-
-test_mse_mod3_lasso <- mean((predicciones_test_mod3_Lass - y_subtest_P_mod3)^2)
-print(paste("Error (mse) de test modelo 5:", test_mse_mod3_lasso))
-
-
-
-#Para el modelo 4 en nomenclatura (modelo 6 a nivel general)
-# ==============================================================================
-x_subtrain_P_mod4 <- model.matrix(Ingtot~ Edad + Edad2 + factor(Sexo), data = datos_subtrain_P)[, -1]
-y_subtrain_P_mod4 <- datos_subtrain_P$Ingtot
-
-x_subtest_P_mod4 <- model.matrix(Ingtot~ Edad + Edad2 + factor(Sexo), data = datos_subtest_P)[, -1]
-y_subtest_P_mod4 <- datos_subtest_P$Ingtot
-
-modelobase4lass <- glmnet(
-  x           = x_subtrain_P_mod4,
-  y           = y_subtrain_P_mod4,
-  alpha       = 1,
-  nlambda     = 200,
-  standardize = TRUE
-)
-
-
-regularizacionmb4lass <- modelobase4lass$beta %>% 
-  as.matrix() %>%
-  t() %>% 
-  as_tibble() %>%
-  mutate(lambda4 = modelobase4lass$lambda)
-
-regularizacionmb4lass <- regularizacionmb4lass %>%
-  pivot_longer(
-    cols = !lambda4, 
-    names_to = "predictor",
-    values_to = "coeficientes"
-  )
-
-regularizacionmb4lass %>%
-  ggplot(aes(x = lambda4, y = coeficientes, color = predictor)) +
-  geom_line() +
-  scale_x_log10(
-    breaks = trans_breaks("log10", function(x) 10^x),
-    labels = trans_format("log10", math_format(10^.x))
-  ) +
-  labs(title = "Coeficientes del modelo 6 en función de la regularización") +
-  theme_bw() +
-  theme(legend.position = "none")
-
-# Evolución del error en función de lambda
-
-set.seed(10101)
-cv_error_m4_Lass <- cv.glmnet(
-  x      = x_subtrain_P_mod4,
-  y      = y_subtrain_P_mod4,
-  alpha  = 1,
-  nfolds = 10,
-  type.measure = "mse",
-  standardize  = TRUE
-)
-
-plot(cv_error_m4_Lass)
-
-paste("Mejor valor de lambda encontrado para modelo 6:", cv_error_m4_Lass$lambda.min)
-paste("Mejor valor de lambda encontrado + 1 desviación estándar para modelo 6:", cv_error_m4_Lass$lambda.1se)
-
-# Mejor modelo lambda óptimo + 1sd
-
-modelo4_Lasso <- glmnet(
-  x           = x_subtrain_P_mod4,
-  y           = y_subtrain_P_mod4,
-  alpha       = 1,
-  lambda      = cv_error_m4_Lass$lambda.1se,
-  standardize = TRUE
-)
-
-# Coeficientes del modelo
-
-df_coeficientes_mod4lass <- coef(modelo4_Lasso) %>%
-  as.matrix() %>%
-  as_tibble(rownames = "predictor") %>%
-  rename(coeficiente = s0)
-
-df_coeficientes_mod4lass %>%
-  filter(predictor != "(Intercept)") %>%
-  ggplot(aes(x = predictor, y = coeficiente)) +
-  geom_col() +
-  labs(title = "Coeficientes del modelo 6 Lasso") +
-  theme_bw() +
-  theme(axis.text.x = element_text(size = 6, angle = 45))
-
-Coeficientes_relevantes_mod4<-df_coeficientes_mod4lass %>%
-  filter(
-    predictor != "(Intercept)",
-    coeficiente != 0
-  ) 
-View( df_coeficientes_mod4lass)
-
-# Predicciones de entrenamiento modelo 6
-
-predicciones_train_mod4_Lass <- predict(modelo4_Lasso, newx = x_subtrain_P_mod4)
-
-# MSE de entrenamiento modelo 6
-
-training_mse_mod4_Lass <- mean((predicciones_train_mod4_Lass - y_subtrain_P_mod4)^2)
-print(paste("Error (mse) de entrenamiento modelo 6:", training_mse_mod4_Lass ))
-
-predicciones_test_mod4_Lass <- predict(modelo4_Lasso, newx = x_subtest_P_mod4)
-
-# MSE de test modelo 6
-
-test_mse_mod4_lasso <- mean((predicciones_test_mod4_Lass - y_subtest_P_mod4)^2)
-print(paste("Error (mse) de test modelo 6:", test_mse_mod4_lasso))
-
-MSE_modelos_test<-c(test_mse_ols_mb1, test_mse_mod1ridge, test_mse_mod1_lasso, test_mse_mod2_lasso, test_mse_mod3_lasso, test_mse_mod4_lasso)
-modelos_<-c('modelo1','modelo 2', 'modelo3', 'modelo 4', 'modelo5','modelo6')
-MSE_errores<-data.frame(modelos_,MSE_modelos_test)
-
-#Se grafica el resultado
-ggplot(data=MSE_errores, aes(x = modelos_, y = MSE_modelos_test, group=1)) + 
-  geom_line()+   geom_point()+  labs(title = "Comparación MSE diferentes modelos (con base test ficticia)") 
 
 
 #====================================================================================================
@@ -2131,28 +1587,61 @@ MSE_errores<-data.frame(modelos_,MSE_modelos)
 ggplot(data=MSE_errores, aes(x = modelos_, y = MSE_modelos, group=1)) + 
   geom_line()+   geom_point()+  labs(title = "Comparación MSE diferentes modelos en términos de MSE (con base training)") 
 
-#Se escoge el modelo 3 que tiene el menor MSE; si bien es algo mayor que el de la regresión OLS, se toma este modelo al tener menos variables (63)
+#Se realiza la confussion matrix para los 9 modelos
 
-Datos_prediccion_train<-data.frame(DTRAIN_PR$id,predicciones_train_mb10)
+#=========================================================================================================================
+#Modelo 1
 
-colnames(Datos_prediccion_train) <- c('id','Ingtot_predicted')
+Datos_prediccion_train_1<-data.frame(DTRAIN_PR$id,predicciones_train_mb10)
 
-sum_ingresos_hogar<-Datos_prediccion_train %>% group_by(id) %>% summarize(Ingtot_hogar1=sum(Ingtot_predicted,na.rm = TRUE)) 
+colnames(Datos_prediccion_train_1) <- c('id','Ingtot_predicted')
+
+sum_ingresos_hogar_1<-Datos_prediccion_train_1 %>% group_by(id) %>% summarize(Ingtot_hogar1=sum(Ingtot_predicted,na.rm = TRUE)) 
 
 #Se asume que la suma del ingreso individual del hogar es aproximadamente igual al Ingtotugarr, al ingreso con imputación de arriendo, teniendo
 #en cuenta que la mayoría de hogares no presenta dichos arriendos y son casi iguales.
 
-DTRAIN_HR<-left_join(DTRAIN_HR, sum_ingresos_hogar) #Se une la variable sum_ingresos_hogar a la base train
+DTRAIN_HR<-left_join(DTRAIN_HR, sum_ingresos_hogar_1) #Se une la variable sum_ingresos_hogar a la base train
 
-#DTRAIN_HR$Ingtot_hogar1<- (DTRAIN_HR$Ingtot_hogar1)
 
-DTRAIN_HR<- DTRAIN_HR %>% mutate(Pobre_predicho_2=ifelse(DTRAIN_HR$Ingtot_hogar1<Lp*Npersug,1,0)) #Se realiza la clasificación final
+DTRAIN_HR<- DTRAIN_HR %>% mutate(Pobre_predicho_1=ifelse(DTRAIN_HR$Ingtot_hogar1<Lp*Npersug,1,0)) #Se realiza la clasificación final
 
 #Se calcula la "Confussion matrix" para determinar el nivel de accuracy y Sensitivity
-CM_Reg_train = confusionMatrix(data= factor(DTRAIN_HR$Pobre_predicho_2) , 
+CM_Reg_train_1 = confusionMatrix(data= factor(DTRAIN_HR$Pobre_predicho_1) , 
                                reference= factor(DTRAIN_HR$Pobre) , 
                                mode="sens_spec" , positive="1")
-CM_Reg_train
+CM_Reg_train_1
+
+#Se revisa la proporción de Pobres (1) y No Pobres (0)
+prop.table(table(DTRAIN_HR$Pobre)) 
+prop.table(table(DTRAIN_HR$Pobre_predicho_1)) 
+
+#Se obtiene información descriptiva de las variables
+summary (DTRAIN_HR$Pobre)
+summary (DTRAIN_HR$Pobre_predicho_1)
+
+#=========================================================================================================================
+#Modelo 2
+
+Datos_prediccion_train_2<-data.frame(DTRAIN_PR$id,predicciones_train_mb1ri_f)
+
+colnames(Datos_prediccion_train_2) <- c('id','Ingtot_predicted')
+
+sum_ingresos_hogar_2<-Datos_prediccion_train_2 %>% group_by(id) %>% summarize(Ingtot_hogar2=sum(Ingtot_predicted,na.rm = TRUE)) 
+
+#Se asume que la suma del ingreso individual del hogar es aproximadamente igual al Ingtotugarr, al ingreso con imputación de arriendo, teniendo
+#en cuenta que la mayoría de hogares no presenta dichos arriendos y son casi iguales.
+
+DTRAIN_HR<-left_join(DTRAIN_HR, sum_ingresos_hogar_2) #Se une la variable sum_ingresos_hogar a la base train
+
+
+DTRAIN_HR<- DTRAIN_HR %>% mutate(Pobre_predicho_2=ifelse(DTRAIN_HR$Ingtot_hogar2<Lp*Npersug,1,0)) #Se realiza la clasificación final
+
+#Se calcula la "Confussion matrix" para determinar el nivel de accuracy y Sensitivity
+CM_Reg_train_2 = confusionMatrix(data= factor(DTRAIN_HR$Pobre_predicho_2) , 
+                                 reference= factor(DTRAIN_HR$Pobre) , 
+                                 mode="sens_spec" , positive="1")
+CM_Reg_train_2
 
 #Se revisa la proporción de Pobres (1) y No Pobres (0)
 prop.table(table(DTRAIN_HR$Pobre)) 
@@ -2162,8 +1651,228 @@ prop.table(table(DTRAIN_HR$Pobre_predicho_2))
 summary (DTRAIN_HR$Pobre)
 summary (DTRAIN_HR$Pobre_predicho_2)
 
+#=========================================================================================================================
+#Modelo 3
 
-##Se realiza la predicción sobre la base Test inicial
+Datos_prediccion_train_3<-data.frame(DTRAIN_PR$id,predicciones_train_mod1_Lass_f)
+
+colnames(Datos_prediccion_train_3) <- c('id','Ingtot_predicted')
+
+sum_ingresos_hogar_3<-Datos_prediccion_train_3 %>% group_by(id) %>% summarize(Ingtot_hogar3=sum(Ingtot_predicted,na.rm = TRUE)) 
+
+#Se asume que la suma del ingreso individual del hogar es aproximadamente igual al Ingtotugarr, al ingreso con imputación de arriendo, teniendo
+#en cuenta que la mayoría de hogares no presenta dichos arriendos y son casi iguales.
+
+DTRAIN_HR<-left_join(DTRAIN_HR, sum_ingresos_hogar_3) #Se une la variable sum_ingresos_hogar a la base train
+
+
+DTRAIN_HR<- DTRAIN_HR %>% mutate(Pobre_predicho_3=ifelse(DTRAIN_HR$Ingtot_hogar3<Lp*Npersug,1,0)) #Se realiza la clasificación final
+
+#Se calcula la "Confussion matrix" para determinar el nivel de accuracy y Sensitivity
+CM_Reg_train_3 = confusionMatrix(data= factor(DTRAIN_HR$Pobre_predicho_3) , 
+                                 reference= factor(DTRAIN_HR$Pobre) , 
+                                 mode="sens_spec" , positive="1")
+CM_Reg_train_3
+
+#Se revisa la proporción de Pobres (1) y No Pobres (0)
+prop.table(table(DTRAIN_HR$Pobre)) 
+prop.table(table(DTRAIN_HR$Pobre_predicho_3)) 
+
+#Se obtiene información descriptiva de las variables
+summary (DTRAIN_HR$Pobre)
+summary (DTRAIN_HR$Pobre_predicho_3)
+
+#=========================================================================================================================
+#Modelo 4
+
+Datos_prediccion_train_4<-data.frame(DTRAIN_PR$id,training_mse_mb2ri_f)
+
+colnames(Datos_prediccion_train_4) <- c('id','Ingtot_predicted')
+
+sum_ingresos_hogar_4<-Datos_prediccion_train_4 %>% group_by(id) %>% summarize(Ingtot_hogar4=sum(Ingtot_predicted,na.rm = TRUE)) 
+
+#Se asume que la suma del ingreso individual del hogar es aproximadamente igual al Ingtotugarr, al ingreso con imputación de arriendo, teniendo
+#en cuenta que la mayoría de hogares no presenta dichos arriendos y son casi iguales.
+
+DTRAIN_HR<-left_join(DTRAIN_HR, sum_ingresos_hogar_4) #Se une la variable sum_ingresos_hogar a la base train
+
+
+DTRAIN_HR<- DTRAIN_HR %>% mutate(Pobre_predicho_4=ifelse(DTRAIN_HR$Ingtot_hogar4<Lp*Npersug,1,0)) #Se realiza la clasificación final
+
+#Se calcula la "Confussion matrix" para determinar el nivel de accuracy y Sensitivity
+CM_Reg_train_4 = confusionMatrix(data= factor(DTRAIN_HR$Pobre_predicho_4) , 
+                                 reference= factor(DTRAIN_HR$Pobre) , 
+                                 mode="sens_spec" , positive="1")
+CM_Reg_train_4
+
+#Se revisa la proporción de Pobres (1) y No Pobres (0)
+prop.table(table(DTRAIN_HR$Pobre)) 
+prop.table(table(DTRAIN_HR$Pobre_predicho_4)) 
+
+#Se obtiene información descriptiva de las variables
+summary (DTRAIN_HR$Pobre)
+summary (DTRAIN_HR$Pobre_predicho_4)
+
+#=========================================================================================================================
+#Modelo 5
+
+Datos_prediccion_train_5<-data.frame(DTRAIN_PR$id,predicciones_train_mod2_Lass_f)
+
+colnames(Datos_prediccion_train_5) <- c('id','Ingtot_predicted')
+
+sum_ingresos_hogar_5<-Datos_prediccion_train_5 %>% group_by(id) %>% summarize(Ingtot_hogar5=sum(Ingtot_predicted,na.rm = TRUE)) 
+
+#Se asume que la suma del ingreso individual del hogar es aproximadamente igual al Ingtotugarr, al ingreso con imputación de arriendo, teniendo
+#en cuenta que la mayoría de hogares no presenta dichos arriendos y son casi iguales.
+
+DTRAIN_HR<-left_join(DTRAIN_HR, sum_ingresos_hogar_5) #Se une la variable sum_ingresos_hogar a la base train
+
+
+DTRAIN_HR<- DTRAIN_HR %>% mutate(Pobre_predicho_5=ifelse(DTRAIN_HR$Ingtot_hogar5<Lp*Npersug,1,0)) #Se realiza la clasificación final
+
+#Se calcula la "Confussion matrix" para determinar el nivel de accuracy y Sensitivity
+CM_Reg_train_5 = confusionMatrix(data= factor(DTRAIN_HR$Pobre_predicho_5) , 
+                                 reference= factor(DTRAIN_HR$Pobre) , 
+                                 mode="sens_spec" , positive="1")
+CM_Reg_train_5
+
+#Se revisa la proporción de Pobres (1) y No Pobres (0)
+prop.table(table(DTRAIN_HR$Pobre)) 
+prop.table(table(DTRAIN_HR$Pobre_predicho_5)) 
+
+#Se obtiene información descriptiva de las variables
+summary (DTRAIN_HR$Pobre)
+summary (DTRAIN_HR$Pobre_predicho_5)
+
+#=========================================================================================================================
+#Modelo 6
+
+Datos_prediccion_train_6<-data.frame(DTRAIN_PR$id,predicciones_train_mb3ri_f)
+
+colnames(Datos_prediccion_train_6) <- c('id','Ingtot_predicted')
+
+sum_ingresos_hogar_6<-Datos_prediccion_train_6 %>% group_by(id) %>% summarize(Ingtot_hogar6=sum(Ingtot_predicted,na.rm = TRUE)) 
+
+#Se asume que la suma del ingreso individual del hogar es aproximadamente igual al Ingtotugarr, al ingreso con imputación de arriendo, teniendo
+#en cuenta que la mayoría de hogares no presenta dichos arriendos y son casi iguales.
+
+DTRAIN_HR<-left_join(DTRAIN_HR, sum_ingresos_hogar_6) #Se une la variable sum_ingresos_hogar a la base train
+
+
+DTRAIN_HR<- DTRAIN_HR %>% mutate(Pobre_predicho_6=ifelse(DTRAIN_HR$Ingtot_hogar6<Lp*Npersug,1,0)) #Se realiza la clasificación final
+
+#Se calcula la "Confussion matrix" para determinar el nivel de accuracy y Sensitivity
+CM_Reg_train_6 = confusionMatrix(data= factor(DTRAIN_HR$Pobre_predicho_6) , 
+                                 reference= factor(DTRAIN_HR$Pobre) , 
+                                 mode="sens_spec" , positive="1")
+CM_Reg_train_6
+
+#Se revisa la proporción de Pobres (1) y No Pobres (0)
+prop.table(table(DTRAIN_HR$Pobre)) 
+prop.table(table(DTRAIN_HR$Pobre_predicho_6)) 
+
+#Se obtiene información descriptiva de las variables
+summary (DTRAIN_HR$Pobre)
+summary (DTRAIN_HR$Pobre_predicho_6)
+
+#=========================================================================================================================
+#Modelo 7
+
+Datos_prediccion_train_7<-data.frame(DTRAIN_PR$id,predicciones_train_mod3_Lass_f)
+
+colnames(Datos_prediccion_train_7) <- c('id','Ingtot_predicted')
+
+sum_ingresos_hogar_7<-Datos_prediccion_train_7 %>% group_by(id) %>% summarize(Ingtot_hogar7=sum(Ingtot_predicted,na.rm = TRUE)) 
+
+#Se asume que la suma del ingreso individual del hogar es aproximadamente igual al Ingtotugarr, al ingreso con imputación de arriendo, teniendo
+#en cuenta que la mayoría de hogares no presenta dichos arriendos y son casi iguales.
+
+DTRAIN_HR<-left_join(DTRAIN_HR, sum_ingresos_hogar_7) #Se une la variable sum_ingresos_hogar a la base train
+
+
+DTRAIN_HR<- DTRAIN_HR %>% mutate(Pobre_predicho_7=ifelse(DTRAIN_HR$Ingtot_hogar7<Lp*Npersug,1,0)) #Se realiza la clasificación final
+
+#Se calcula la "Confussion matrix" para determinar el nivel de accuracy y Sensitivity
+CM_Reg_train_7 = confusionMatrix(data= factor(DTRAIN_HR$Pobre_predicho_7) , 
+                                 reference= factor(DTRAIN_HR$Pobre) , 
+                                 mode="sens_spec" , positive="1")
+CM_Reg_train_7
+
+#Se revisa la proporción de Pobres (1) y No Pobres (0)
+prop.table(table(DTRAIN_HR$Pobre)) 
+prop.table(table(DTRAIN_HR$Pobre_predicho_7)) 
+
+#Se obtiene información descriptiva de las variables
+summary (DTRAIN_HR$Pobre)
+summary (DTRAIN_HR$Pobre_predicho_7)
+
+#=========================================================================================================================
+#Modelo 8
+
+Datos_prediccion_train_8<-data.frame(DTRAIN_PR$id,predicciones_train_mb4ri_f)
+
+colnames(Datos_prediccion_train_8) <- c('id','Ingtot_predicted')
+
+sum_ingresos_hogar_8<-Datos_prediccion_train_8 %>% group_by(id) %>% summarize(Ingtot_hogar8=sum(Ingtot_predicted,na.rm = TRUE)) 
+
+#Se asume que la suma del ingreso individual del hogar es aproximadamente igual al Ingtotugarr, al ingreso con imputación de arriendo, teniendo
+#en cuenta que la mayoría de hogares no presenta dichos arriendos y son casi iguales.
+
+DTRAIN_HR<-left_join(DTRAIN_HR, sum_ingresos_hogar_8) #Se une la variable sum_ingresos_hogar a la base train
+
+
+DTRAIN_HR<- DTRAIN_HR %>% mutate(Pobre_predicho_8=ifelse(DTRAIN_HR$Ingtot_hogar8<Lp*Npersug,1,0)) #Se realiza la clasificación final
+
+#Se calcula la "Confussion matrix" para determinar el nivel de accuracy y Sensitivity
+CM_Reg_train_8 = confusionMatrix(data= factor(DTRAIN_HR$Pobre_predicho_8) , 
+                                 reference= factor(DTRAIN_HR$Pobre) , 
+                                 mode="sens_spec" , positive="1")
+CM_Reg_train_8
+
+#Se revisa la proporción de Pobres (1) y No Pobres (0)
+prop.table(table(DTRAIN_HR$Pobre)) 
+prop.table(table(DTRAIN_HR$Pobre_predicho_8)) 
+
+#Se obtiene información descriptiva de las variables
+summary (DTRAIN_HR$Pobre)
+summary (DTRAIN_HR$Pobre_predicho_8)
+
+#=========================================================================================================================
+#Modelo 9
+
+Datos_prediccion_train_9<-data.frame(DTRAIN_PR$id,predicciones_train_mod4_Lass_f)
+
+colnames(Datos_prediccion_train_9) <- c('id','Ingtot_predicted')
+
+sum_ingresos_hogar_9<-Datos_prediccion_train_9 %>% group_by(id) %>% summarize(Ingtot_hogar9=sum(Ingtot_predicted,na.rm = TRUE)) 
+
+#Se asume que la suma del ingreso individual del hogar es aproximadamente igual al Ingtotugarr, al ingreso con imputación de arriendo, teniendo
+#en cuenta que la mayoría de hogares no presenta dichos arriendos y son casi iguales.
+
+DTRAIN_HR<-left_join(DTRAIN_HR, sum_ingresos_hogar_9) #Se une la variable sum_ingresos_hogar a la base train
+
+
+DTRAIN_HR<- DTRAIN_HR %>% mutate(Pobre_predicho_9=ifelse(DTRAIN_HR$Ingtot_hogar9<Lp*Npersug,1,0)) #Se realiza la clasificación final
+
+#Se calcula la "Confussion matrix" para determinar el nivel de accuracy y Sensitivity
+CM_Reg_train_9 = confusionMatrix(data= factor(DTRAIN_HR$Pobre_predicho_9) , 
+                                 reference= factor(DTRAIN_HR$Pobre) , 
+                                 mode="sens_spec" , positive="1")
+CM_Reg_train_9
+
+#Se revisa la proporción de Pobres (1) y No Pobres (0)
+prop.table(table(DTRAIN_HR$Pobre)) 
+prop.table(table(DTRAIN_HR$Pobre_predicho_9)) 
+
+#Se obtiene información descriptiva de las variables
+summary (DTRAIN_HR$Pobre)
+summary (DTRAIN_HR$Pobre_predicho_9)
+
+
+#=====================================================================================
+
+
+##Se realiza la predicción sobre la base Test inicial para el modelo escogido (modelo 1): 
 predicciones_test_final <- predict(model_base_10, newdata = DTEST_PR)
 Datos_prediccion_test<-data.frame(DTEST_PR$id,predicciones_test_final)
 colnames(Datos_prediccion_test) <- c('id','Ingtot_predicted_test')
@@ -2180,5 +1889,5 @@ view(DTEST_HR$Pobre_predicho_final)
 prop.table(table(DTEST_HR$Pobre_predicho_final)) 
 
 TestResulstFinal_2 <- cbind(TestResulstFinal_1 , DTEST_HR$Pobre_predicho_final )
-colnames(TestResulstFinal_2) <- c('id','Pobre_classification','Pobre_inncome')
-write.csv (TestResulstFinal_2, "../Elementos_Guardados/predictions_beleno_gaona_c4_r116.csv")
+colnames(TestResulstFinal_2) <- c('id','Pobre_classification','Pobre_income')
+write.csv (TestResulstFinal_2, "../Elementos_Guardados/predictions_beleno_gaona_c4_r34.csv")
