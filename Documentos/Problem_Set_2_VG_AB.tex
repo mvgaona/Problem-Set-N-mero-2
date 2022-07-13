@@ -44,7 +44,7 @@ Generar una política para la población adecuada es fundamental para la constru
 \subsection{Modelo de Clasificación}
 La pobreza puede estar dada por diferentes variables. Sin embargo, es fundamental contar con las variables relevantes para que este modelo sea robusto, pero no se incurran en gastos que entorpezcan la investigación.\\
 La variable \textit{Npersug} (No. Personas en la unidad de gasto) evidencia aquellas personas que dentro del hogar están dentro de la unidad de gasto. De acuerdo con el análisis, la moda de esta variable es 3, es decir, 3 personas por unidad de gasto es el valor más común entre unidades de gasto por familia. Además, se evidencia que el rango va de 1 a 28 personas por UG.
-La línea de pobreza (Lp) establece el límite de ingresos por debajo del cual un hogar es considerado pobre. El valor mínimo es COP 167.222;  el máximo COP 303.8107; la media COP 271.605; la moda COP 281.549,3. Además, de acuerdo con DANE(2018) evidencia que la línea de pobreza monetaria nacional fue de \$257.433 pesos.
+La línea de pobreza (Lp) establece el límite de ingresos por debajo del cual un hogar es considerado pobre. El valor mínimo es COP 167.222;  el máximo COP 303.8107; la media COP 271.605; la moda COP 281.549,3. Además, de acuerdo con DANE(2019) \cite{b1} evidencia que la línea de pobreza monetaria nacional fue de \$257.433 pesos.
 La variable Dominio es una variable categórica que indica en donde vive el hogar. Existen 25 niveles, entre ellos Bogotá, Villavicencio, rural, entre otros. \\
 La variable categórica P5090 (OcViv) hace referencia al tipo de ocupación que tiene hogar en la vivienda, es decir, arriendo, propia, entre otros. Por otra parte, la variable numérica P5000 hace referencia a la cantidad de habitaciones que cuenta la vivienda que tiene el hogar, evidenciando que el mínimo es 1 habitación, máximo 98 y la cantidad de habitación más común es 3.
 
@@ -401,6 +401,11 @@ De lo cual se tienen las siguientes conclusiones:
 \item La regresión del Ingreso presentó un MSE alto para todos los modelos, motivo por el cual, se puede estar dando este resultado en donde hay pobres clasificados como no pobres.
 \item Los resultados más aceptables para el ejercicio, tanto de clasificación como de regresión, fueron los que tuvieron en cuenta mayor cantidad de variables que pudiesen explicar las variables dependientes en cada caso.
 \end{itemize}
+
+\begin{thebibliography}{00}
+\bibitem{b1} DANE “Boletín Técnico Pobreza Monetaria en Colombia Año 2018” Bogotá D.C Mayo 3,2019 Tomado de: \url{https://www.dane.gov.co/files/investigaciones/condiciones_vida/pobreza/2018/bt_pobreza_monetaria_18.pdf}
+
+\end{thebibliography}
 
 
 \end{document}
